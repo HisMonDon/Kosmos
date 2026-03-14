@@ -40,7 +40,7 @@
   width: 100%;
 }
 
-.column {
+.columnstart {
   display: flex;
   flex-direction: column;
 }
