@@ -18,6 +18,43 @@
   }
 }
 
+.rowstart {
+  display: flex;
+  flex-direction: row;
+  align-items: start;
+  /* crossAxisAlignment */
+  justify-content: space-between;
+  /* mainAxisAlignment */
+  gap: 12px;
+  width: 100%;
+}
+
+.rowcenter {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  /* crossAxisAlignment */
+  justify-content: space-between;
+  /* mainAxisAlignment */
+  gap: 12px;
+  width: 100%;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+}
+
+.columncenter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* crossAxisAlignment */
+  justify-content: center;
+  /* mainAxisAlignment */
+  gap: 12px;
+}
+
 .hero {
   position: relative;
 
@@ -28,21 +65,7 @@
     margin: 0 auto;
   }
 
-  .row {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    /* crossAxisAlignment */
-    justify-content: space-between;
-    /* mainAxisAlignment */
-    gap: 12px;
-    width: 100%;
-  }
 
-  .column {
-    display: flex;
-    flex-direction: column;
-  }
 
   .base {
     width: 170px;
