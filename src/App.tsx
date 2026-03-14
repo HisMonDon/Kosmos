@@ -9,10 +9,12 @@ function App() {
   return (
     <>
       <section id="center">
-        <div className="hero">
-        </div>
+        {/* <div className="hero">
+        </div> */}
         <div className="rowstart">
-          <h1>Kosmos</h1>
+          <span style={{ fontSize: '32px', fontWeight: 'bold', color: '#802fbe' }}>
+            Kosmos
+          </span>
         </div>
         <button
           className="counter"
