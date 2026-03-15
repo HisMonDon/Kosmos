@@ -25,7 +25,7 @@
   /* crossAxisAlignment */
   justify-content: space-between;
   /* mainAxisAlignment */
-  gap: 12px;
+  gap: 0px;
   width: 100%;
 }
 
@@ -36,7 +36,7 @@
   /* crossAxisAlignment */
   justify-content: space-between;
   /* mainAxisAlignment */
-  gap: 12px;
+  gap: 0px;
   width: 100%;
 }
 
@@ -54,7 +54,7 @@
   /* crossAxisAlignment */
   justify-content: center;
   /* mainAxisAlignment */
-  gap: 12px;
+  gap: 0px;
 }
 
 .hero {
