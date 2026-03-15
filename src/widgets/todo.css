@@ -4,7 +4,9 @@
 
 .todo-container {
     width: 100%;
-    max-width: 520px;
+    max-width: none;
+    min-width: 0;
+    flex: 1 1 auto;
     margin: 0 auto;
     min-height: 100%;
     padding: 22px;

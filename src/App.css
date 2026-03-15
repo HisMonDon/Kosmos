@@ -77,6 +77,8 @@
 
 .content-row {
   margin-top: 4px;
+  position: relative;
+  align-items: stretch;
 }
 
 .hero {

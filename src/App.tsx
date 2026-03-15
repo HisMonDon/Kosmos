@@ -1,6 +1,7 @@
 //import { useState } from 'react'
 import './App.css'
 import TodoList from './widgets/todo'
+import Sidebar from './widgets/sidebar'
 
 function App() {
   //const [count, setCount] = useState(0)
@@ -14,8 +15,11 @@ function App() {
           </span>
           <div className="ticks"></div>
         </div>
-        <div className="rowcenter content-row">
+        <div className="rowstart">
           <TodoList />
+          <div style={{ padding: '20px' }}>
+          </div>
+          <Sidebar />
         </div>
       </div>
       <section id="spacer"></section>
