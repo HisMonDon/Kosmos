@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import './todo.css'
-
+import './App.css'
 type Todo = {
     id: number
     text: string
@@ -42,7 +42,7 @@ export default function TodoList() {
         try {
             window.localStorage.setItem(TODO_STORAGE_KEY, JSON.stringify(todos))
         } catch {
-            // Ignore storage quota and private mode errors.
+
         }
     }, [todos])
 
@@ -76,9 +76,12 @@ export default function TodoList() {
         <section className="todo-card" aria-label="Todo List">
             <header className="todo-header">
                 <h2>Todo List</h2>
-                <div className="todo-stats" aria-live="polite">
-                    <span className="todo-pill">{todos.length} total</span>
-                    <span className="todo-pill">{doneCount} done</span>
+                <div className="rowstart">
+                    <div className="todo-stats" aria-live="polite">
+                        <span className="todo-pill">{todos.length} total</span>
+                        <span className="todo-pill">{doneCount} done</span>
+                    </div>
+                    <button type="submit">Add</button>
                 </div>
             </header>
 
