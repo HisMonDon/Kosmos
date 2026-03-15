@@ -15,14 +15,11 @@ function App() {
           </span>
           <div className="ticks"></div>
         </div>
-        <div className="rowstart">
+        <div className="content-row">
           <TodoList />
-          <div style={{ padding: '20px' }}>
-          </div>
           <Sidebar />
         </div>
       </div>
-      <section id="spacer"></section>
     </>
   )
 }

@@ -1,15 +1,17 @@
 .sidebar-shell {
-    position: absolute;
-    top: 18px;
-    right: -8px;
+    position: relative;
+    top: 0;
+    right: 0;
     z-index: 6;
     display: flex;
     justify-content: flex-end;
-    align-items: flex-start;
+    align-items: stretch;
 }
 
 .sidebar-tube {
     width: 54px;
+    height: 100%;
+    min-height: 0;
     padding: 10px 8px;
     border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
     border-radius: 999px 0 0 999px;
