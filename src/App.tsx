@@ -8,12 +8,12 @@ function App() {
 
   return (
     <>
-      <section id="center">
+      <section>
         {/* <div className="hero">
         </div> */}
         <div className="columnstart">
-          <div className="rowstart">
-            <span style={{ fontSize: '32px', fontWeight: 'bold', color: '#802fbe' }}>
+          <div className="rowstart" style={{ padding: '20px 16px' }}>
+            <span style={{ fontSize: '32px', fontWeight: 'bold', color: '#b568f0' }}>
               Kosmos
             </span>
           </div>
