@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './todo.css'
 
 type Todo = {
@@ -7,10 +7,44 @@ type Todo = {
     done: boolean
 }
 
+const TODO_STORAGE_KEY = 'kosmos.todos'
+
+function isTodoArray(value: unknown): value is Todo[] {
+    if (!Array.isArray(value)) return false
+    return value.every((item) => {
+        if (typeof item !== 'object' || item === null) return false
+        const maybeTodo = item as { id?: unknown; text?: unknown; done?: unknown }
+        return (
+            typeof maybeTodo.id === 'number' &&
+            typeof maybeTodo.text === 'string' &&
+            typeof maybeTodo.done === 'boolean'
+        )
+    })
+}
+
+function loadTodosFromStorage(): Todo[] {
+    try {
+        const raw = window.localStorage.getItem(TODO_STORAGE_KEY)
+        if (!raw) return []
+        const parsed: unknown = JSON.parse(raw)
+        return isTodoArray(parsed) ? parsed : []
+    } catch {
+        return []
+    }
+}
+
 export default function TodoList() {
     const [input, setInput] = useState('')
-    const [todos, setTodos] = useState<Todo[]>([])
+    const [todos, setTodos] = useState<Todo[]>(loadTodosFromStorage)
     const doneCount = todos.filter((todo) => todo.done).length
+
+    useEffect(() => {
+        try {
+            window.localStorage.setItem(TODO_STORAGE_KEY, JSON.stringify(todos))
+        } catch {
+            // Ignore storage quota and private mode errors.
+        }
+    }, [todos])
 
     function addTodo() {
         const text = input.trim()
