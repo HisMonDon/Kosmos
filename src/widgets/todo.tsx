@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import './todo.css'
-import '../App.css'
 
 type Todo = {
     id: number
@@ -12,13 +11,13 @@ type Todo = {
     }
 }
 
-type RecurringMode = 'daily' | 'date'
+type RecurringMode = 'daily' | 'weekly'
 
 type RecurringTask = {
     id: number
     text: string
     mode: RecurringMode
-    date?: string
+    weekday?: number
 }
 
 const TODO_STORAGE_KEY = 'kosmos.todos'
@@ -30,6 +29,18 @@ function getTodayKey(): string {
     const month = String(now.getMonth() + 1).padStart(2, '0')
     const day = String(now.getDate()).padStart(2, '0')
     return `${year}-${month}-${day}`
+}
+
+function getWeekdayIndex(date = new Date()): number {
+    return date.getDay()
+}
+
+function getWeekdayLabel(weekday: number): string {
+    return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][weekday] ?? 'Unknown day'
+}
+
+function getWeeklyLabel(weekday: number): string {
+    return `Weekly}`
 }
 
 function createId(): number {
@@ -80,21 +91,26 @@ function isRecurringTaskArray(value: unknown): value is RecurringTask[] {
             id?: unknown
             text?: unknown
             mode?: unknown
+            weekday?: unknown
             date?: unknown
         }
 
         const hasCoreFields =
             typeof maybeTask.id === 'number' &&
             typeof maybeTask.text === 'string' &&
-            (maybeTask.mode === 'daily' || maybeTask.mode === 'date')
+            (maybeTask.mode === 'daily' || maybeTask.mode === 'weekly' || maybeTask.mode === 'date')
 
         if (!hasCoreFields) return false
+
+        if (maybeTask.mode === 'weekly') {
+            return typeof maybeTask.weekday === 'number'
+        }
 
         if (maybeTask.mode === 'date') {
             return typeof maybeTask.date === 'string'
         }
 
-        return typeof maybeTask.date === 'undefined'
+        return typeof maybeTask.weekday === 'undefined' && typeof maybeTask.date === 'undefined'
     })
 }
 
@@ -114,7 +130,21 @@ function loadRecurringTasksFromStorage(): RecurringTask[] {
         const raw = window.localStorage.getItem(RECURRING_STORAGE_KEY)
         if (!raw) return []
         const parsed: unknown = JSON.parse(raw)
-        return isRecurringTaskArray(parsed) ? parsed : []
+        if (!isRecurringTaskArray(parsed)) return []
+
+        return parsed.map((task) => {
+            if ('date' in task && typeof task.date === 'string') {
+                const parsedDate = new Date(task.date)
+                return {
+                    id: task.id,
+                    text: task.text,
+                    mode: 'weekly',
+                    weekday: Number.isNaN(parsedDate.getTime()) ? getWeekdayIndex() : parsedDate.getDay(),
+                }
+            }
+
+            return task
+        })
     } catch {
         return []
     }
@@ -128,14 +158,14 @@ export default function TodoList() {
     const [editingRecurringId, setEditingRecurringId] = useState<number | null>(null)
     const [recurringText, setRecurringText] = useState('')
     const [recurringMode, setRecurringMode] = useState<RecurringMode>('daily')
-    const [recurringDate, setRecurringDate] = useState(getTodayKey())
+    const [recurringWeekday, setRecurringWeekday] = useState(getWeekdayIndex())
     const doneCount = todos.filter((todo) => todo.done).length
 
     useEffect(() => {
         try {
             window.localStorage.setItem(TODO_STORAGE_KEY, JSON.stringify(todos))
         } catch {
-
+            //
         }
     }, [todos])
 
@@ -143,20 +173,24 @@ export default function TodoList() {
         try {
             window.localStorage.setItem(RECURRING_STORAGE_KEY, JSON.stringify(recurringTasks))
         } catch {
-
+            //
         }
     }, [recurringTasks])
 
     useEffect(() => {
         const today = getTodayKey()
+        const todayWeekday = getWeekdayIndex()
 
         setTodos((previousTodos) => {
             let didAdd = false
             let nextTodos = previousTodos
 
             recurringTasks.forEach((task) => {
-                const dueDate = task.mode === 'daily' ? today : task.date
-                if (!dueDate || dueDate !== today) return
+                const isDueToday =
+                    task.mode === 'daily' ||
+                    (task.mode === 'weekly' && task.weekday === todayWeekday)
+
+                if (!isDueToday) return
 
                 const alreadyExists = nextTodos.some(
                     (todo) =>
@@ -216,7 +250,7 @@ export default function TodoList() {
         setEditingRecurringId(null)
         setRecurringText('')
         setRecurringMode('daily')
-        setRecurringDate(getTodayKey())
+        setRecurringWeekday(getWeekdayIndex())
         setIsRecurringModalOpen(true)
     }
 
@@ -224,7 +258,7 @@ export default function TodoList() {
         setEditingRecurringId(task.id)
         setRecurringText(task.text)
         setRecurringMode(task.mode)
-        setRecurringDate(task.date ?? getTodayKey())
+        setRecurringWeekday(task.weekday ?? getWeekdayIndex())
         setIsRecurringModalOpen(true)
     }
 
@@ -243,13 +277,12 @@ export default function TodoList() {
         event.preventDefault()
         const text = recurringText.trim()
         if (!text) return
-        if (recurringMode === 'date' && !recurringDate) return
 
         const nextTask: RecurringTask = {
             id: editingRecurringId ?? createId(),
             text,
             mode: recurringMode,
-            ...(recurringMode === 'date' ? { date: recurringDate } : {}),
+            ...(recurringMode === 'weekly' ? { weekday: recurringWeekday } : {}),
         }
 
         setRecurringTasks((prev) => {
@@ -264,162 +297,188 @@ export default function TodoList() {
     }
 
     return (
-        <section className="todo-card" aria-label="Todo List">
+        <div className="todo-container">
             <header className="todo-header">
-                <h2>Todo List</h2>
-                <div className="rowstart">
-                    <div className="todo-stats" aria-live="polite">
-                        <span className="todo-pill">{todos.length} total</span>
-                        <span className="todo-pill">{doneCount} done</span>
+                <h1>Tasks</h1>
+                <div className="todo-stats">
+                    <div className="stat-item">
+                        <span className="stat-label">Total</span>
+                        <span className="stat-value">{todos.length}</span>
                     </div>
-
+                    <div className="stat-item">
+                        <span className="stat-label">Done</span>
+                        <span className="stat-value">{doneCount}</span>
+                    </div>
                 </div>
             </header>
 
-            <form className="todo-form" onSubmit={onSubmit}>
+            <form className="todo-input-form" onSubmit={onSubmit}>
                 <input
+                    type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Add a task"
+                    placeholder="Add a new task..."
                     aria-label="New todo"
                 />
-                <button type="submit">Add</button>
+                <button type="submit" className="btn-add">
+                    <span>+</span>
+                </button>
             </form>
 
-            <ul className="todo-list">
-                {todos.length === 0 && (
-                    <li className="todo-empty">No tasks yet. Add your first one.</li>
-                )}
-                {todos.map((todo) => (
-                    <li key={todo.id} className="todo-item">
-                        <input
-                            type="checkbox"
-                            checked={todo.done}
-                            onChange={() => toggleTodo(todo.id)}
-                            aria-label={`Mark ${todo.text} as done`}
-                        />
-                        <span className={todo.done ? 'todo-text done' : 'todo-text'}>
-                            {todo.text}
-                        </span>
-                        <button type="button" className="danger" onClick={() => removeTodo(todo.id)}>
-                            Delete
-                        </button>
-                    </li>
-                ))}
-            </ul>
+            <div className="todo-section">
+                <ul className="todo-list">
+                    {todos.length === 0 ? (
+                        <li className="empty-state">
+                            <p>No tasks yet</p>
+                            <p className="empty-hint">Add one to get started</p>
+                        </li>
+                    ) : (
+                        todos.map((todo) => (
+                            <li key={todo.id} className={`todo-item ${todo.done ? 'done' : ''}`}>
+                                <input
+                                    type="checkbox"
+                                    checked={todo.done}
+                                    onChange={() => toggleTodo(todo.id)}
+                                    aria-label={`Mark ${todo.text} as done`}
+                                    className="todo-checkbox"
+                                />
+                                <span className="todo-text">{todo.text}</span>
+                                <button
+                                    type="button"
+                                    className="btn-delete"
+                                    onClick={() => removeTodo(todo.id)}
+                                    aria-label="Delete task"
+                                >
+                                    ×
+                                </button>
+                            </li>
+                        ))
+                    )}
+                </ul>
+            </div>
 
-            <section className="recurring-section" aria-label="Recurring tasks">
-                <div className="rowstart recurring-header">
-                    <h3>Recurring tasks</h3>
+            <div className="recurring-section">
+                <div className="recurring-header">
+                    <h2>Recurring</h2>
                     <button
                         type="button"
-                        className="secondary recurring-add-button"
+                        className="btn-add-recurring"
                         onClick={openCreateRecurringModal}
                     >
-                        Add recurring
+                        Add
                     </button>
                 </div>
 
                 <ul className="recurring-list">
-                    {recurringTasks.length === 0 && (
-                        <li className="todo-empty">No recurring tasks yet.</li>
-                    )}
-
-                    {recurringTasks.map((task) => (
-                        <li key={task.id} className="todo-item recurring-item">
-                            <div className="recurring-body">
-                                <span className="todo-text">{task.text}</span>
-                                <span className="todo-pill recurring-pill">
-                                    {task.mode === 'daily' ? 'Daily' : `On ${task.date}`}
-                                </span>
-                            </div>
-
-                            <div className="recurring-actions">
-                                <button
-                                    type="button"
-                                    className="secondary"
-                                    onClick={() => openEditRecurringModal(task)}
-                                >
-                                    Edit
-                                </button>
-                                <button
-                                    type="button"
-                                    className="danger"
-                                    onClick={() => removeRecurringTask(task.id)}
-                                >
-                                    Delete
-                                </button>
-                            </div>
+                    {recurringTasks.length === 0 ? (
+                        <li className="empty-state">
+                            <p>No recurring tasks</p>
                         </li>
-                    ))}
+                    ) : (
+                        recurringTasks.map((task) => (
+                            <li key={task.id} className="recurring-item">
+                                <div className="recurring-info">
+                                    <span className="recurring-text">{task.text}</span>
+                                    <span className="recurring-badge">
+                                        {task.mode === 'daily'
+                                            ? 'Daily'
+                                            : getWeeklyLabel(task.weekday ?? getWeekdayIndex())}
+                                    </span>
+                                </div>
+                                <div className="recurring-actions">
+                                    <button
+                                        type="button"
+                                        className="btn-edit"
+                                        onClick={() => openEditRecurringModal(task)}
+                                        aria-label="Edit recurring task"
+                                    >
+                                        ✎
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn-delete"
+                                        onClick={() => removeRecurringTask(task.id)}
+                                        aria-label="Delete recurring task"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+                            </li>
+                        ))
+                    )}
                 </ul>
-            </section>
+            </div>
 
             {isRecurringModalOpen && (
-                <div
-                    className="todo-modal-backdrop"
-                    role="presentation"
-                    onClick={closeRecurringModal}
-                >
-                    <div
-                        className="todo-modal"
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="recurring-modal-title"
-                        onClick={(event) => event.stopPropagation()}
-                    >
-                        <h3 id="recurring-modal-title">
-                            {editingRecurringId === null ? 'Add recurring task' : 'Edit recurring task'}
-                        </h3>
+                <div className="modal-overlay" onClick={closeRecurringModal}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()}>
+                        <h2 className="modal-title">
+                            {editingRecurringId === null ? 'Add Recurring Task' : 'Edit Recurring Task'}
+                        </h2>
 
-                        <form className="recurring-form" onSubmit={submitRecurringTask}>
-                            <label>
-                                Task name
+                        <form className="modal-form" onSubmit={submitRecurringTask}>
+                            <div className="form-group">
+                                <label htmlFor="task-name">Task name</label>
                                 <input
+                                    id="task-name"
+                                    type="text"
                                     value={recurringText}
-                                    onChange={(event) => setRecurringText(event.target.value)}
-                                    placeholder="Read 10 pages"
+                                    onChange={(e) => setRecurringText(e.target.value)}
+                                    placeholder="e.g., Read 10 pages"
                                     aria-label="Recurring task name"
                                     required
                                 />
-                            </label>
+                            </div>
 
-                            <label>
-                                Repeat
+                            <div className="form-group">
+                                <label htmlFor="repeat-mode">Repeat</label>
                                 <select
+                                    id="repeat-mode"
                                     value={recurringMode}
-                                    onChange={(event) => setRecurringMode(event.target.value as RecurringMode)}
+                                    onChange={(e) => setRecurringMode(e.target.value as RecurringMode)}
                                     aria-label="Recurring rule"
                                 >
-                                    <option value="daily">Daily</option>
-                                    <option value="date">Specific date</option>
+                                    <option value="daily">Every day</option>
+                                    <option value="weekly">
+                                        {`Weekly`}
+                                    </option>
                                 </select>
-                            </label>
+                            </div>
 
-                            <label>
-                                Date
-                                <input
-                                    type="date"
-                                    value={recurringDate}
-                                    onChange={(event) => setRecurringDate(event.target.value)}
-                                    disabled={recurringMode !== 'date'}
-                                    required={recurringMode === 'date'}
-                                    aria-label="Recurring date"
-                                />
-                            </label>
+                            {recurringMode === 'weekly' && (
+                                <div className="form-group">
+                                    <label htmlFor="repeat-day">Repeats on</label>
+                                    <select
+                                        id="repeat-day"
+                                        value={recurringWeekday}
+                                        onChange={(e) => setRecurringWeekday(Number(e.target.value))}
+                                        aria-label="Recurring weekday"
+                                    >
+                                        {[0, 1, 2, 3, 4, 5, 6].map((weekday) => (
+                                            <option key={weekday} value={weekday}>
+                                                {getWeekdayLabel(weekday)}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
 
-                            <div className="recurring-form-actions">
-                                <button type="button" className="secondary" onClick={closeRecurringModal}>
+                            <div className="modal-actions">
+                                <button
+                                    type="button"
+                                    className="btn-cancel"
+                                    onClick={closeRecurringModal}
+                                >
                                     Cancel
                                 </button>
-                                <button type="submit">
-                                    {editingRecurringId === null ? 'Create' : 'Save changes'}
+                                <button type="submit" className="btn-save">
+                                    {editingRecurringId === null ? 'Create' : 'Save'}
                                 </button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
-        </section>
+        </div>
     )
 }
