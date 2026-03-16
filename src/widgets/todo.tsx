@@ -22,6 +22,7 @@ type RecurringTask = {
 
 const TODO_STORAGE_KEY = 'kosmos.todos'
 const RECURRING_STORAGE_KEY = 'kosmos.recurring-tasks'
+const DEFAULT_WEEKDAY = 0
 
 function getTodayKey(): string {
     const now = new Date()
@@ -31,16 +32,12 @@ function getTodayKey(): string {
     return `${year}-${month}-${day}`
 }
 
-function getWeekdayIndex(date = new Date()): number {
-    return date.getDay()
-}
-
 function getWeekdayLabel(weekday: number): string {
     return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][weekday] ?? 'Unknown day'
 }
 
 function getWeeklyLabel(weekday: number): string {
-    return `Weekly}`
+    return `Weekly on ${getWeekdayLabel(weekday)}`
 }
 
 function createId(): number {
@@ -139,7 +136,7 @@ function loadRecurringTasksFromStorage(): RecurringTask[] {
                     id: task.id,
                     text: task.text,
                     mode: 'weekly',
-                    weekday: Number.isNaN(parsedDate.getTime()) ? getWeekdayIndex() : parsedDate.getDay(),
+                    weekday: Number.isNaN(parsedDate.getTime()) ? DEFAULT_WEEKDAY : parsedDate.getDay(),
                 }
             }
 
@@ -158,7 +155,7 @@ export default function TodoList() {
     const [editingRecurringId, setEditingRecurringId] = useState<number | null>(null)
     const [recurringText, setRecurringText] = useState('')
     const [recurringMode, setRecurringMode] = useState<RecurringMode>('daily')
-    const [recurringWeekday, setRecurringWeekday] = useState(getWeekdayIndex())
+    const [recurringWeekday, setRecurringWeekday] = useState(DEFAULT_WEEKDAY)
     const doneCount = todos.filter((todo) => todo.done).length
 
     useEffect(() => {
@@ -179,7 +176,7 @@ export default function TodoList() {
 
     useEffect(() => {
         const today = getTodayKey()
-        const todayWeekday = getWeekdayIndex()
+        const todayWeekday = new Date().getDay()
 
         setTodos((previousTodos) => {
             let didAdd = false
@@ -250,7 +247,7 @@ export default function TodoList() {
         setEditingRecurringId(null)
         setRecurringText('')
         setRecurringMode('daily')
-        setRecurringWeekday(getWeekdayIndex())
+        setRecurringWeekday(DEFAULT_WEEKDAY)
         setIsRecurringModalOpen(true)
     }
 
@@ -258,7 +255,7 @@ export default function TodoList() {
         setEditingRecurringId(task.id)
         setRecurringText(task.text)
         setRecurringMode(task.mode)
-        setRecurringWeekday(task.weekday ?? getWeekdayIndex())
+        setRecurringWeekday(task.weekday ?? DEFAULT_WEEKDAY)
         setIsRecurringModalOpen(true)
     }
 
@@ -382,7 +379,7 @@ export default function TodoList() {
                                     <span className="recurring-badge">
                                         {task.mode === 'daily'
                                             ? 'Daily'
-                                            : getWeeklyLabel(task.weekday ?? getWeekdayIndex())}
+                                            : getWeeklyLabel(task.weekday ?? DEFAULT_WEEKDAY)}
                                     </span>
                                 </div>
                                 <div className="recurring-actions">
