@@ -81,7 +81,8 @@
 .content-row {
   margin-top: 2px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  position: relative;
+  grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
   gap: 10px;
   min-height: 0;

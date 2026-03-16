@@ -1,7 +1,8 @@
 .sidebar-shell {
-    position: relative;
+    position: absolute;
     top: 0;
     right: 0;
+    bottom: 0;
     z-index: 6;
     display: flex;
     justify-content: flex-end;
