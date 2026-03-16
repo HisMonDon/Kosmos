@@ -11,11 +11,11 @@
 
 .sidebar-tube {
     width: 54px;
-    height: 30%;
+    height: 40%;
     min-height: 0;
     padding: 10px 8px;
     border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
-    border-radius: 999px 0 0 999px;
+    border-radius: 20px 0 0 20px;
     background:
         radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 18%, transparent), transparent 42%),
         linear-gradient(180deg, color-mix(in srgb, var(--bg) 92%, white), color-mix(in srgb, var(--bg) 82%, var(--code-bg)));
@@ -43,7 +43,7 @@
     width: 100%;
     min-height: 44px;
     border: 0;
-    border-radius: 999px;
+    border-radius: 14px;
     background: transparent;
     color: var(--text-h);
     display: flex;
@@ -71,7 +71,7 @@
 .sidebar-icon {
     width: 34px;
     height: 34px;
-    border-radius: 999px;
+    border-radius: 10px;
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
@@ -85,6 +85,16 @@
         inset 0 1px 0 rgba(255, 255, 255, 0.26);
     transform: translateX(1px);
     transition: transform 220ms ease;
+}
+
+.sidebar-icon svg {
+    width: 17px;
+    height: 17px;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
 }
 
 .sidebar-shell:hover .sidebar-icon {
