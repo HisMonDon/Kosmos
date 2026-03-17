@@ -3,7 +3,7 @@
 }
 
 .todo-container {
-    width: 100%;
+    width: 80%;
     max-width: none;
     min-width: 0;
     flex: 1 1 auto;
@@ -11,6 +11,7 @@
     min-height: 0;
     height: 100%;
     padding: 16px;
+    transform: translateX(-30px);
     border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
     border-radius: 30px;
     background:
