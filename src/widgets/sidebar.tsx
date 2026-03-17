@@ -1,7 +1,8 @@
 import './sidebar.css'
-import { CiSettings } from "react-icons/ci";
+
 import { RiFocus3Line } from "react-icons/ri";
 import { FaTasks } from "react-icons/fa";
+import { FaChartPie } from "react-icons/fa";
 
 const items = [
     {
@@ -19,10 +20,10 @@ const items = [
         ),
     },
     {
-        id: 'settings',
-        label: 'Settings',
+        id: 'screen_time',
+        label: 'Screen Time',
         icon: (
-            <CiSettings />
+            <FaChartPie />
         ),
     },
 ]
