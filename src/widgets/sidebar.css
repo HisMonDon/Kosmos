@@ -54,7 +54,12 @@
     cursor: pointer;
     transition:
         background 160ms ease,
-        transform 160ms ease;
+        transform 160ms ease,
+        padding 220ms ease;
+}
+
+.sidebar-shell:hover .sidebar-item {
+    padding: 0 8px 0 12px;
 }
 
 .sidebar-item:hover {
@@ -90,11 +95,7 @@
 .sidebar-icon svg {
     width: 17px;
     height: 17px;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    fill: none;
+    display: block;
 }
 
 .sidebar-shell:hover .sidebar-icon {
