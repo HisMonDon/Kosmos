@@ -1,10 +1,24 @@
-//import { useState } from 'react'
+import { useState } from 'react'
 import './App.css'
 import TodoList from './widgets/todo'
-import Sidebar from './widgets/sidebar'
+import Sidebar, { type WidgetId } from './widgets/sidebar'
+import FocusWidget from './widgets/focus'
+import ScreenTimeWidget from './widgets/screenTime'
 
 function App() {
-  //const [count, setCount] = useState(0)
+  const [selectedWidget, setSelectedWidget] = useState<WidgetId>('tasks')
+
+  function renderWidget() {
+    switch (selectedWidget) {
+      case 'focus':
+        return <FocusWidget />
+      case 'screen_time':
+        return <ScreenTimeWidget />
+      case 'tasks':
+      default:
+        return <TodoList />
+    }
+  }
 
   return (
     <>
@@ -16,8 +30,8 @@ function App() {
           <div className="ticks"></div>
         </div>
         <div className="content-row">
-          <TodoList />
-          <Sidebar />
+          {renderWidget()}
+          <Sidebar selectedId={selectedWidget} onSelect={setSelectedWidget} />
         </div>
       </div>
     </>

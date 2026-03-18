@@ -1,0 +1,75 @@
+.widget-panel {
+    width: 80%;
+    max-width: none;
+    min-width: 0;
+    flex: 1 1 auto;
+    margin: 0 auto;
+    min-height: 0;
+    height: 100%;
+    padding: 20px;
+    transform: translateX(-30px);
+    border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+    border-radius: 30px;
+    background:
+        radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 18%, transparent), transparent 40%),
+        radial-gradient(circle at bottom left, color-mix(in srgb, var(--accent-bg) 95%, transparent), transparent 35%),
+        linear-gradient(180deg, color-mix(in srgb, var(--bg) 90%, white), color-mix(in srgb, var(--bg) 82%, var(--code-bg)));
+    box-shadow:
+        0 26px 54px rgba(47, 20, 82, 0.14),
+        inset 0 1px 0 color-mix(in srgb, white 72%, transparent);
+    color: var(--text);
+    backdrop-filter: blur(14px);
+    overflow: hidden;
+    display: grid;
+    align-content: start;
+    gap: 14px;
+}
+
+.widget-panel h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    color: var(--text-h);
+}
+
+.widget-panel p {
+    margin: 0;
+    color: var(--text);
+    font-size: 14px;
+}
+
+.panel-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.panel-stat {
+    border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+    border-radius: 16px;
+    padding: 12px;
+    background: color-mix(in srgb, var(--accent-bg) 62%, var(--bg));
+}
+
+.panel-stat-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.panel-stat-value {
+    display: block;
+    margin-top: 4px;
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+@media (max-width: 560px) {
+    .panel-stat-grid {
+        grid-template-columns: 1fr;
+    }
+}

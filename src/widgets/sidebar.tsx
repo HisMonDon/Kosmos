@@ -4,6 +4,8 @@ import { RiFocus3Line } from "react-icons/ri";
 import { FaTasks } from "react-icons/fa";
 import { FaChartPie } from "react-icons/fa";
 
+export type WidgetId = 'tasks' | 'focus' | 'screen_time'
+
 const items = [
     {
         id: 'tasks',
@@ -28,12 +30,23 @@ const items = [
     },
 ]
 
-export default function Sidebar() {
+type SidebarProps = {
+    selectedId: WidgetId
+    onSelect: (id: WidgetId) => void
+}
+
+export default function Sidebar({ selectedId, onSelect }: SidebarProps) {
     return (
         <aside className="sidebar-shell" aria-label="Sidebar shortcuts">
             <div className="sidebar-tube">
                 {items.map((item) => (
-                    <button key={item.id} type="button" className="sidebar-item">
+                    <button
+                        key={item.id}
+                        type="button"
+                        className={`sidebar-item ${selectedId === item.id ? 'is-active' : ''}`}
+                        onClick={() => onSelect(item.id as WidgetId)}
+                        aria-pressed={selectedId === item.id}
+                    >
                         <span className="sidebar-icon" aria-hidden="true">
                             {item.icon}
                         </span>
