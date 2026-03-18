@@ -67,8 +67,6 @@
     transform: translateX(-1px);
 }
 
-.sidebar-item.is-active {}
-
 .sidebar-item.is-active .sidebar-icon {
     transform: translateX(-1px) scale(1.03);
     box-shadow:
