@@ -1,13 +1,25 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 import TodoList from './widgets/todo'
 import Sidebar, { type WidgetId } from './widgets/sidebar'
 import FocusWidget from './widgets/focus'
-import ScreenTimeWidget from './widgets/screenTime'
+import ScreenTimeWidget from './widgets/screen_time/screenTime'
 
 function App() {
   const [selectedWidget, setSelectedWidget] = useState<WidgetId>('tasks')
-
+  const [totalTime, setItems] = useState<string[]>([]);
+  useEffect(() => {
+    const saved = localStorage.getItem("items");
+    if (saved) {
+      setItems(JSON.parse(saved));
+    }
+  }, []);
+  useEffect(() => {
+    localStorage.setItem("items", JSON.stringify(items));
+  }, [items]);
+  function addItem() {
+    setItems([...items, "New Item"]);
+  }
   function renderWidget() {
     switch (selectedWidget) {
       case 'focus':
@@ -36,6 +48,7 @@ function App() {
       </div>
     </>
   )
+
 }
 
 export default App

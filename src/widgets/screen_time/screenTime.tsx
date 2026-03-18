@@ -1,6 +1,11 @@
 import './widgetPanel.css'
-
+import { useState } from 'react';
 export default function ScreenTimeWidget() {
+    const [items, setItems] = useState([]);
+    function addItem(text) {
+        const newItem = { id: Date.now(), text };
+        setItems([...items, newItem]);
+    }
     return (
         <section className="widget-panel" aria-labelledby="screen-time-title">
             <h1 id="screen-time-title">Screen Time</h1>
