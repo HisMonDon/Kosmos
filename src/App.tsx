@@ -7,7 +7,8 @@ import ScreenTimeWidget from './widgets/screen_time/screenTime'
 
 function App() {
   const [selectedWidget, setSelectedWidget] = useState<WidgetId>('tasks')
-  const [totalTime, setItems] = useState<string[]>([]);
+  const [totalTime, setItems] = useState<[string, number][]>([]);
+
   useEffect(() => {
     const saved = localStorage.getItem("items");
     if (saved) {
@@ -15,10 +16,10 @@ function App() {
     }
   }, []);
   useEffect(() => {
-    localStorage.setItem("items", JSON.stringify(items));
-  }, [items]);
-  function addItem() {
-    setItems([...items, "New Item"]);
+    localStorage.setItem("items", JSON.stringify(totalTime));
+  }, [totalTime]);
+  function totaladdEntry() {
+    setItems([...totalTime, ["New Item", 0]]);
   }
   function renderWidget() {
     switch (selectedWidget) {
