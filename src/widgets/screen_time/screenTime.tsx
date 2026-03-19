@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import '../widgetPanel.css'
 
-const STORAGE_KEY = 'siteTime'
+const DAILY_STORAGE_KEY = 'siteTimeDaily'
+const MONTHLY_STORAGE_KEY = 'siteTimeMonthly'
 const FLUSH_INTERVAL_MS = 2000
 const CHART_COLORS = ['#8b46ff', '#5f93ff', '#00a39d', '#ff7a59', '#f2b133']
 const DONUT_SIZE = 120
@@ -9,7 +10,9 @@ const DONUT_STROKE_WIDTH = 22
 const DONUT_RADIUS = (DONUT_SIZE - DONUT_STROKE_WIDTH) / 2
 const DONUT_CIRCUMFERENCE = 2 * Math.PI * DONUT_RADIUS
 
+type TimeRange = 'daily' | 'monthly'
 type SiteTimeByDomain = Record<string, number>
+type SiteTimeHistory = Record<string, SiteTimeByDomain>
 type StorageChange = {
     newValue?: unknown
 }
@@ -22,7 +25,7 @@ type ExtensionApi = {
         }
         storage?: {
             local?: {
-                get: (key: string) => Promise<Record<string, unknown>>
+                get: (keys: string | string[]) => Promise<Record<string, unknown>>
             }
             onChanged: {
                 addListener: (callback: (changes: Record<string, StorageChange>, areaName: string) => void) => void
@@ -35,9 +38,18 @@ type ExtensionApi = {
     }
 }
 
+type LegendEntry = {
+    label: string
+    durationMs: number
+    ratio: number
+    color: string
+    href: string
+    chartLabel: string
+}
+
 type ChartSlice = {
     label: string
-    seconds: number
+    durationMs: number
     ratio: number
     color: string
     startOffset: number
@@ -47,11 +59,11 @@ type ChartSlice = {
     isAggregate: boolean
 }
 
-function formatDuration(totalSeconds: number): string {
-    const seconds = Math.max(0, Math.floor(totalSeconds))
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-    const remainingSeconds = seconds % 60
+function formatDuration(totalDurationMs: number): string {
+    const totalSeconds = Math.max(0, Math.floor(totalDurationMs / 1000))
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const remainingSeconds = totalSeconds % 60
 
     if (hours > 0) return `${hours}h ${minutes}m ${remainingSeconds}s`
     if (minutes > 0) return `${minutes}m ${remainingSeconds}s`
@@ -82,8 +94,56 @@ function getTooltipPosition(midAngle: number) {
     }
 }
 
+function getDayKey(date: Date): string {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+}
+
+function getMonthKey(date: Date): string {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    return `${year}-${month}`
+}
+
+function normalizeHistory(rawHistory: unknown): SiteTimeHistory {
+    if (!rawHistory || typeof rawHistory !== 'object') {
+        return {}
+    }
+
+    const nextHistory: SiteTimeHistory = {}
+
+    Object.entries(rawHistory as Record<string, unknown>).forEach(([periodKey, periodValue]) => {
+        if (!periodValue || typeof periodValue !== 'object') {
+            return
+        }
+
+        const nextPeriod: SiteTimeByDomain = {}
+
+        Object.entries(periodValue as Record<string, unknown>).forEach(([domain, durationMs]) => {
+            if (typeof durationMs === 'number' && Number.isFinite(durationMs) && durationMs > 0) {
+                nextPeriod[domain] = durationMs
+            }
+        })
+
+        if (Object.keys(nextPeriod).length > 0) {
+            nextHistory[periodKey] = nextPeriod
+        }
+    })
+
+    return nextHistory
+}
+
+function getCurrentPeriodKey(range: TimeRange): string {
+    const now = new Date()
+    return range === 'daily' ? getDayKey(now) : getMonthKey(now)
+}
+
 export default function ScreenTimeWidget() {
-    const [siteTime, setSiteTime] = useState<SiteTimeByDomain>({})
+    const [dailyHistory, setDailyHistory] = useState<SiteTimeHistory>({})
+    const [monthlyHistory, setMonthlyHistory] = useState<SiteTimeHistory>({})
+    const [selectedRange, setSelectedRange] = useState<TimeRange>('daily')
     const [activeSliceLabel, setActiveSliceLabel] = useState<string | null>(null)
 
     useEffect(() => {
@@ -99,48 +159,32 @@ export default function ScreenTimeWidget() {
 
         let isMounted = true
 
-        async function loadSiteTime() {
-            const stored = await storageLocalApi.get(STORAGE_KEY)
-            const raw = stored?.[STORAGE_KEY]
-            if (!isMounted || !raw || typeof raw !== 'object') {
-                if (isMounted && !raw) setSiteTime({})
-                return
-            }
+        async function loadTrackingHistory() {
+            const stored = await storageLocalApi.get([DAILY_STORAGE_KEY, MONTHLY_STORAGE_KEY])
+            if (!isMounted) return
 
-            const next: SiteTimeByDomain = {}
-            Object.entries(raw).forEach(([domain, value]) => {
-                if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-                    next[domain] = value
-                }
-            })
-            setSiteTime(next)
+            setDailyHistory(normalizeHistory(stored[DAILY_STORAGE_KEY]))
+            setMonthlyHistory(normalizeHistory(stored[MONTHLY_STORAGE_KEY]))
         }
 
-        const onStorageChanged = (changes: Record<string, { newValue?: unknown }>, areaName: string) => {
-            if (areaName !== 'local' || !changes[STORAGE_KEY]) return
+        const onStorageChanged = (changes: Record<string, StorageChange>, areaName: string) => {
+            if (areaName !== 'local') return
 
-            const changedValue = changes[STORAGE_KEY].newValue
-            if (!changedValue || typeof changedValue !== 'object') {
-                setSiteTime({})
-                return
+            if (DAILY_STORAGE_KEY in changes) {
+                setDailyHistory(normalizeHistory(changes[DAILY_STORAGE_KEY]?.newValue))
             }
 
-            const next: SiteTimeByDomain = {}
-            Object.entries(changedValue as Record<string, unknown>).forEach(([domain, value]) => {
-                if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-                    next[domain] = value
-                }
-            })
-            setSiteTime(next)
+            if (MONTHLY_STORAGE_KEY in changes) {
+                setMonthlyHistory(normalizeHistory(changes[MONTHLY_STORAGE_KEY]?.newValue))
+            }
         }
 
-        void loadSiteTime()
+        void loadTrackingHistory()
         storageEventsApi.addListener(onStorageChanged)
 
         const flushTimer = window.setInterval(() => {
             if (!runtime?.sendMessage) return
             runtime.sendMessage({ type: 'FLUSH_SITE_TIME' }, () => {
-                // Ignore runtime errors while popup is open/closing.
                 void runtime.lastError
             })
         }, FLUSH_INTERVAL_MS)
@@ -152,32 +196,38 @@ export default function ScreenTimeWidget() {
         }
     }, [])
 
+    const currentPeriodKey = getCurrentPeriodKey(selectedRange)
+    const siteTime = useMemo(
+        () => (selectedRange === 'daily' ? dailyHistory[currentPeriodKey] : monthlyHistory[currentPeriodKey]) ?? {},
+        [currentPeriodKey, dailyHistory, monthlyHistory, selectedRange]
+    )
+
     const sortedSites = useMemo(
         () => Object.entries(siteTime).sort((a, b) => b[1] - a[1]),
         [siteTime]
     )
 
-    const totalSeconds = useMemo(
-        () => sortedSites.reduce((sum, [, seconds]) => sum + seconds, 0),
+    const totalDurationMs = useMemo(
+        () => sortedSites.reduce((sum, [, durationMs]) => sum + durationMs, 0),
         [sortedSites]
     )
 
     const chartSlices = useMemo<ChartSlice[]>(() => {
-        if (totalSeconds <= 0 || sortedSites.length === 0) return []
+        if (totalDurationMs <= 0 || sortedSites.length === 0) return []
 
         const topSites = sortedSites.slice(0, 4)
-        const topTotal = topSites.reduce((sum, [, seconds]) => sum + seconds, 0)
+        const topTotal = topSites.reduce((sum, [, durationMs]) => sum + durationMs, 0)
         let strokeOffset = 0
         let angleCursor = 0
 
         const buildSlice = (
             label: string,
-            seconds: number,
+            durationMs: number,
             color: string,
             href: string | null,
             isAggregate: boolean
         ): ChartSlice => {
-            const ratio = seconds / totalSeconds
+            const ratio = durationMs / totalDurationMs
             const dashLength = ratio * DONUT_CIRCUMFERENCE
             const startAngle = angleCursor
             const endAngle = angleCursor + ratio * 360
@@ -185,7 +235,7 @@ export default function ScreenTimeWidget() {
 
             const nextSlice: ChartSlice = {
                 label,
-                seconds,
+                durationMs,
                 ratio,
                 color,
                 startOffset: strokeOffset,
@@ -199,44 +249,85 @@ export default function ScreenTimeWidget() {
             return nextSlice
         }
 
-        const slices: ChartSlice[] = topSites.map(([label, seconds], index) =>
-            buildSlice(label, seconds, CHART_COLORS[index % CHART_COLORS.length], getSiteUrl(label), false)
+        const slices: ChartSlice[] = topSites.map(([label, durationMs], index) =>
+            buildSlice(label, durationMs, CHART_COLORS[index % CHART_COLORS.length], getSiteUrl(label), false)
         )
 
         if (sortedSites.length > 4) {
-            slices.push(buildSlice('Other', totalSeconds - topTotal, CHART_COLORS[4], null, true))
+            slices.push(buildSlice('Other', totalDurationMs - topTotal, CHART_COLORS[4], null, true))
         }
 
         return slices
-    }, [sortedSites, totalSeconds])
+    }, [sortedSites, totalDurationMs])
+
+    const legendEntries = useMemo<LegendEntry[]>(() => {
+        if (totalDurationMs <= 0) return []
+
+        return sortedSites.map(([label, durationMs], index) => ({
+            label,
+            durationMs,
+            ratio: durationMs / totalDurationMs,
+            color: CHART_COLORS[Math.min(index, CHART_COLORS.length - 1)],
+            href: getSiteUrl(label),
+            chartLabel: index < 4 ? label : 'Other',
+        }))
+    }, [sortedSites, totalDurationMs])
 
     const topSite = sortedSites[0]
     const activeSlice = chartSlices.find((slice) => slice.label === activeSliceLabel) ?? null
 
-    function openTrackedSite(slice: ChartSlice) {
-        if (!slice.href) return
-
+    function openSite(url: string) {
         const extensionApi = (globalThis as ExtensionApi).chrome
 
         if (extensionApi?.tabs?.create) {
-            extensionApi.tabs.create({ url: slice.href })
+            extensionApi.tabs.create({ url })
             return
         }
 
-        window.open(slice.href, '_blank', 'noopener,noreferrer')
+        window.open(url, '_blank', 'noopener,noreferrer')
     }
+
+    const periodCopy =
+        selectedRange === 'daily'
+            ? 'Today only. Idle time is ignored so the tracker follows active browsing more closely.'
+            : 'This month so far. Idle time is ignored so totals stay more accurate.'
 
     return (
         <section className="widget-panel" aria-labelledby="screen-time-title">
             <div className="screen-time-scrollable">
-                <h1 id="screen-time-title">Screen Time</h1>
-                <p>Auto-tracked from your active browser tab while the extension is running.</p>
+                <div className="screen-time-header">
+                    <div>
+                        <h1 id="screen-time-title">Screen Time</h1>
+                        <p>{periodCopy}</p>
+                    </div>
+
+                    <div className="screen-time-tabs" role="tablist" aria-label="Screen time range">
+                        <button
+                            type="button"
+                            role="tab"
+                            aria-selected={selectedRange === 'daily'}
+                            className={`screen-time-tab${selectedRange === 'daily' ? ' is-active' : ''}`}
+                            onClick={() => setSelectedRange('daily')}
+                        >
+                            Daily
+                        </button>
+                        <button
+                            type="button"
+                            role="tab"
+                            aria-selected={selectedRange === 'monthly'}
+                            className={`screen-time-tab${selectedRange === 'monthly' ? ' is-active' : ''}`}
+                            onClick={() => setSelectedRange('monthly')}
+                        >
+                            Monthly
+                        </button>
+                    </div>
+                </div>
 
                 <div className="screen-time-chart-wrap" aria-label="Screen time distribution">
                     <div
                         className="screen-time-donut"
                         role="img"
-                        aria-label={`Tracked ${formatDuration(totalSeconds)} across ${sortedSites.length} site${sortedSites.length === 1 ? '' : 's'}`}
+                        aria-label={`Tracked ${formatDuration(totalDurationMs)} across ${sortedSites.length} site${sortedSites.length === 1 ? '' : 's'}`}
                     >
                         <svg
                             className="screen-time-donut-chart"
@@ -265,20 +356,22 @@ export default function ScreenTimeWidget() {
                                     onMouseLeave={() => setActiveSliceLabel((current) => (current === slice.label ? null : current))}
                                     onFocus={() => setActiveSliceLabel(slice.label)}
                                     onBlur={() => setActiveSliceLabel((current) => (current === slice.label ? null : current))}
-                                    onClick={() => openTrackedSite(slice)}
+                                    onClick={() => {
+                                        if (slice.href) openSite(slice.href)
+                                    }}
                                     onKeyDown={(event) => {
                                         if (slice.isAggregate) return
                                         if (event.key !== 'Enter' && event.key !== ' ') return
 
                                         event.preventDefault()
-                                        openTrackedSite(slice)
+                                        if (slice.href) openSite(slice.href)
                                     }}
                                     role={slice.isAggregate ? undefined : 'link'}
                                     tabIndex={slice.isAggregate ? -1 : 0}
                                     aria-label={
                                         slice.isAggregate
-                                            ? `${slice.label}: ${formatDuration(slice.seconds)}`
-                                            : `${slice.label}: ${formatDuration(slice.seconds)}. Open site.`
+                                            ? `${slice.label}: ${formatDuration(slice.durationMs)}`
+                                            : `${slice.label}: ${formatDuration(slice.durationMs)}. Open site.`
                                     }
                                 />
                             ))}
@@ -291,31 +384,38 @@ export default function ScreenTimeWidget() {
                                 aria-live="polite"
                             >
                                 <strong>{activeSlice.label}</strong>
-                                <span>{formatDuration(activeSlice.seconds)}</span>
+                                <span>{formatDuration(activeSlice.durationMs)}</span>
                                 <span>{describePercent(activeSlice.ratio)}</span>
                             </div>
                         ) : null}
 
                         <div className="screen-time-donut-core">
-                            <span className="screen-time-donut-title">Total</span>
-                            <strong className="screen-time-donut-value">{formatDuration(totalSeconds)}</strong>
+                            <span className="screen-time-donut-title">{selectedRange === 'daily' ? 'Today' : 'Month'}</span>
+                            <strong className="screen-time-donut-value">{formatDuration(totalDurationMs)}</strong>
                         </div>
                     </div>
 
-                    <div className="screen-time-legend" aria-label="Distribution legend">
-                        {chartSlices.length === 0 ? (
+                    <div className="screen-time-legend" aria-label="Tracked sites">
+                        {legendEntries.length === 0 ? (
                             <p className="panel-empty">No tracked activity yet.</p>
                         ) : (
-                            chartSlices.map((slice) => (
+                            legendEntries.map((entry) => (
                                 <div
-                                    key={slice.label}
-                                    className={`screen-time-legend-row${activeSliceLabel === slice.label ? ' is-active' : ''}`}
+                                    key={entry.label}
+                                    className={`screen-time-legend-row${activeSliceLabel === entry.chartLabel ? ' is-active' : ''}`}
                                 >
                                     <span className="screen-time-legend-name">
-                                        <span className="screen-time-legend-dot" style={{ backgroundColor: slice.color }} />
-                                        {slice.label}
+                                        <span className="screen-time-legend-dot" style={{ backgroundColor: entry.color }} />
+                                        {entry.label}
                                     </span>
-                                    <span className="screen-time-legend-value">{describePercent(slice.ratio)}</span>
+                                    <button
+                                        type="button"
+                                        className="screen-time-legend-link"
+                                        onClick={() => openSite(entry.href)}
+                                        aria-label={`Open ${entry.label}`}
+                                    >
+                                        {describePercent(entry.ratio)}
+                                    </button>
                                 </div>
                             ))
                         )}
@@ -325,7 +425,7 @@ export default function ScreenTimeWidget() {
                 <div className="panel-stat-grid" aria-label="Screen time metrics">
                     <article className="panel-stat">
                         <span className="panel-stat-label">Tracked</span>
-                        <span className="panel-stat-value">{formatDuration(totalSeconds)}</span>
+                        <span className="panel-stat-value">{formatDuration(totalDurationMs)}</span>
                     </article>
                     <article className="panel-stat">
                         <span className="panel-stat-label">Sites</span>
@@ -336,7 +436,6 @@ export default function ScreenTimeWidget() {
                         <span className="panel-stat-value">{topSite ? topSite[0] : '-'}</span>
                     </article>
                 </div>
-
             </div>
         </section>
     )

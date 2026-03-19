@@ -86,6 +86,53 @@
     font-size: 14px;
 }
 
+.screen-time-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.screen-time-tabs {
+    display: inline-flex;
+    gap: 6px;
+    padding: 4px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+    background: color-mix(in srgb, var(--accent-bg) 34%, var(--bg));
+    flex: 0 0 auto;
+}
+
+.screen-time-tab {
+    border: 0;
+    border-radius: 999px;
+    padding: 8px 12px;
+    background: transparent;
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition:
+        background-color 160ms ease,
+        color 160ms ease,
+        transform 160ms ease;
+}
+
+.screen-time-tab:hover,
+.screen-time-tab:focus-visible {
+    outline: none;
+    background: color-mix(in srgb, var(--accent-bg) 72%, var(--bg));
+    color: var(--text-h);
+}
+
+.screen-time-tab.is-active {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 72%, white), var(--accent));
+    color: white;
+    box-shadow:
+        0 10px 18px color-mix(in srgb, var(--accent) 22%, transparent),
+        inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
 .panel-stat-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -225,6 +272,7 @@
 .screen-time-legend {
     display: grid;
     gap: 6px;
+    align-content: start;
 }
 
 .screen-time-legend-row {
@@ -262,6 +310,23 @@
     font-size: 12px;
     color: var(--accent);
     font-weight: 700;
+}
+
+.screen-time-legend-link {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.screen-time-legend-link:hover,
+.screen-time-legend-link:focus-visible {
+    outline: none;
+    text-decoration: underline;
+    text-underline-offset: 2px;
 }
 
 .panel-list {
@@ -305,6 +370,15 @@
 }
 
 @media (max-width: 560px) {
+    .screen-time-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .screen-time-tabs {
+        width: fit-content;
+    }
+
     .screen-time-chart-wrap {
         grid-template-columns: 1fr;
         justify-items: center;
