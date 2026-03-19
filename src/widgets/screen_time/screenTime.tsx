@@ -143,7 +143,7 @@ export default function ScreenTimeWidget() {
     const topSite = sortedSites[0]
 
     return (
-        <section className="widget-panel" aria-labelledby="screen-time-title">
+        <section className="widget-panel widget-panel-scrollable" aria-labelledby="screen-time-title">
             <h1 id="screen-time-title">Screen Time</h1>
             <p>Auto-tracked from your active browser tab while the extension is running.</p>
 

@@ -25,6 +25,12 @@
     gap: 14px;
 }
 
+.widget-panel-scrollable {
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-gutter: stable;
+}
+
 .widget-panel h1 {
     margin: 0;
     font-size: 24px;
@@ -76,8 +82,8 @@
 }
 
 .screen-time-donut {
-    width: 120px;
-    height: 120px;
+    width: 175px;
+    height: 175px;
     border-radius: 50%;
     display: grid;
     place-items: center;
@@ -86,8 +92,8 @@
 }
 
 .screen-time-donut-core {
-    width: 72px;
-    height: 72px;
+    width: 130px;
+    height: 130px;
     border-radius: 50%;
     display: grid;
     align-content: center;
