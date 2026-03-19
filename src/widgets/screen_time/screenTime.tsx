@@ -227,126 +227,128 @@ export default function ScreenTimeWidget() {
     }
 
     return (
-        <section className="widget-panel widget-panel-scrollable" aria-labelledby="screen-time-title">
-            <h1 id="screen-time-title">Screen Time</h1>
-            <p>Auto-tracked from your active browser tab while the extension is running.</p>
+        <section className="widget-panel" aria-labelledby="screen-time-title">
+            <div className="screen-time-scrollable">
+                <h1 id="screen-time-title">Screen Time</h1>
+                <p>Auto-tracked from your active browser tab while the extension is running.</p>
 
-            <div className="screen-time-chart-wrap" aria-label="Screen time distribution">
-                <div
-                    className="screen-time-donut"
-                    role="img"
-                    aria-label={`Tracked ${formatDuration(totalSeconds)} across ${sortedSites.length} site${sortedSites.length === 1 ? '' : 's'}`}
-                >
-                    <svg
-                        className="screen-time-donut-chart"
-                        viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`}
-                        aria-hidden="true"
+                <div className="screen-time-chart-wrap" aria-label="Screen time distribution">
+                    <div
+                        className="screen-time-donut"
+                        role="img"
+                        aria-label={`Tracked ${formatDuration(totalSeconds)} across ${sortedSites.length} site${sortedSites.length === 1 ? '' : 's'}`}
                     >
-                        <circle
-                            className="screen-time-donut-track"
-                            cx={DONUT_SIZE / 2}
-                            cy={DONUT_SIZE / 2}
-                            r={DONUT_RADIUS}
-                        />
-                        {chartSlices.map((slice) => (
+                        <svg
+                            className="screen-time-donut-chart"
+                            viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`}
+                            aria-hidden="true"
+                        >
                             <circle
-                                key={slice.label}
-                                className={`screen-time-donut-slice${slice.isAggregate ? '' : ' is-clickable'}${activeSliceLabel === slice.label ? ' is-active' : ''}`}
+                                className="screen-time-donut-track"
                                 cx={DONUT_SIZE / 2}
                                 cy={DONUT_SIZE / 2}
                                 r={DONUT_RADIUS}
-                                fill="none"
-                                stroke={slice.color}
-                                strokeWidth={DONUT_STROKE_WIDTH}
-                                strokeDasharray={`${slice.dashLength} ${DONUT_CIRCUMFERENCE - slice.dashLength}`}
-                                strokeDashoffset={-slice.startOffset}
-                                onMouseEnter={() => setActiveSliceLabel(slice.label)}
-                                onMouseLeave={() => setActiveSliceLabel((current) => (current === slice.label ? null : current))}
-                                onFocus={() => setActiveSliceLabel(slice.label)}
-                                onBlur={() => setActiveSliceLabel((current) => (current === slice.label ? null : current))}
-                                onClick={() => openTrackedSite(slice)}
-                                onKeyDown={(event) => {
-                                    if (slice.isAggregate) return
-                                    if (event.key !== 'Enter' && event.key !== ' ') return
-
-                                    event.preventDefault()
-                                    openTrackedSite(slice)
-                                }}
-                                role={slice.isAggregate ? undefined : 'link'}
-                                tabIndex={slice.isAggregate ? -1 : 0}
-                                aria-label={
-                                    slice.isAggregate
-                                        ? `${slice.label}: ${formatDuration(slice.seconds)}`
-                                        : `${slice.label}: ${formatDuration(slice.seconds)}. Open site.`
-                                }
                             />
-                        ))}
-                    </svg>
+                            {chartSlices.map((slice) => (
+                                <circle
+                                    key={slice.label}
+                                    className={`screen-time-donut-slice${slice.isAggregate ? '' : ' is-clickable'}${activeSliceLabel === slice.label ? ' is-active' : ''}`}
+                                    cx={DONUT_SIZE / 2}
+                                    cy={DONUT_SIZE / 2}
+                                    r={DONUT_RADIUS}
+                                    fill="none"
+                                    stroke={slice.color}
+                                    strokeWidth={DONUT_STROKE_WIDTH}
+                                    strokeDasharray={`${slice.dashLength} ${DONUT_CIRCUMFERENCE - slice.dashLength}`}
+                                    strokeDashoffset={-slice.startOffset}
+                                    onMouseEnter={() => setActiveSliceLabel(slice.label)}
+                                    onMouseLeave={() => setActiveSliceLabel((current) => (current === slice.label ? null : current))}
+                                    onFocus={() => setActiveSliceLabel(slice.label)}
+                                    onBlur={() => setActiveSliceLabel((current) => (current === slice.label ? null : current))}
+                                    onClick={() => openTrackedSite(slice)}
+                                    onKeyDown={(event) => {
+                                        if (slice.isAggregate) return
+                                        if (event.key !== 'Enter' && event.key !== ' ') return
 
-                    {activeSlice ? (
-                        <div
-                            className="screen-time-tooltip"
-                            style={getTooltipPosition(activeSlice.midAngle)}
-                            aria-live="polite"
-                        >
-                            <strong>{activeSlice.label}</strong>
-                            <span>{formatDuration(activeSlice.seconds)}</span>
-                            <span>{describePercent(activeSlice.ratio)}</span>
+                                        event.preventDefault()
+                                        openTrackedSite(slice)
+                                    }}
+                                    role={slice.isAggregate ? undefined : 'link'}
+                                    tabIndex={slice.isAggregate ? -1 : 0}
+                                    aria-label={
+                                        slice.isAggregate
+                                            ? `${slice.label}: ${formatDuration(slice.seconds)}`
+                                            : `${slice.label}: ${formatDuration(slice.seconds)}. Open site.`
+                                    }
+                                />
+                            ))}
+                        </svg>
+
+                        {activeSlice ? (
+                            <div
+                                className="screen-time-tooltip"
+                                style={getTooltipPosition(activeSlice.midAngle)}
+                                aria-live="polite"
+                            >
+                                <strong>{activeSlice.label}</strong>
+                                <span>{formatDuration(activeSlice.seconds)}</span>
+                                <span>{describePercent(activeSlice.ratio)}</span>
+                            </div>
+                        ) : null}
+
+                        <div className="screen-time-donut-core">
+                            <span className="screen-time-donut-title">Total</span>
+                            <strong className="screen-time-donut-value">{formatDuration(totalSeconds)}</strong>
                         </div>
-                    ) : null}
+                    </div>
 
-                    <div className="screen-time-donut-core">
-                        <span className="screen-time-donut-title">Total</span>
-                        <strong className="screen-time-donut-value">{formatDuration(totalSeconds)}</strong>
+                    <div className="screen-time-legend" aria-label="Distribution legend">
+                        {chartSlices.length === 0 ? (
+                            <p className="panel-empty">No tracked activity yet.</p>
+                        ) : (
+                            chartSlices.map((slice) => (
+                                <div
+                                    key={slice.label}
+                                    className={`screen-time-legend-row${activeSliceLabel === slice.label ? ' is-active' : ''}`}
+                                >
+                                    <span className="screen-time-legend-name">
+                                        <span className="screen-time-legend-dot" style={{ backgroundColor: slice.color }} />
+                                        {slice.label}
+                                    </span>
+                                    <span className="screen-time-legend-value">{describePercent(slice.ratio)}</span>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
 
-                <div className="screen-time-legend" aria-label="Distribution legend">
-                    {chartSlices.length === 0 ? (
-                        <p className="panel-empty">No tracked activity yet.</p>
+                <div className="panel-stat-grid" aria-label="Screen time metrics">
+                    <article className="panel-stat">
+                        <span className="panel-stat-label">Tracked</span>
+                        <span className="panel-stat-value">{formatDuration(totalSeconds)}</span>
+                    </article>
+                    <article className="panel-stat">
+                        <span className="panel-stat-label">Sites</span>
+                        <span className="panel-stat-value">{sortedSites.length}</span>
+                    </article>
+                    <article className="panel-stat">
+                        <span className="panel-stat-label">Top Site</span>
+                        <span className="panel-stat-value">{topSite ? topSite[0] : '-'}</span>
+                    </article>
+                </div>
+
+                <div className="panel-list" aria-label="Tracked sites">
+                    {sortedSites.length === 0 ? (
+                        <p className="panel-empty">No tracked activity yet. Browse websites with the extension enabled.</p>
                     ) : (
-                        chartSlices.map((slice) => (
-                            <div
-                                key={slice.label}
-                                className={`screen-time-legend-row${activeSliceLabel === slice.label ? ' is-active' : ''}`}
-                            >
-                                <span className="screen-time-legend-name">
-                                    <span className="screen-time-legend-dot" style={{ backgroundColor: slice.color }} />
-                                    {slice.label}
-                                </span>
-                                <span className="screen-time-legend-value">{describePercent(slice.ratio)}</span>
+                        sortedSites.slice(0, 6).map(([domain, seconds]) => (
+                            <div key={domain} className="panel-row">
+                                <span className="panel-row-domain">{domain}</span>
+                                <span className="panel-row-time">{formatDuration(seconds)}</span>
                             </div>
                         ))
                     )}
                 </div>
-            </div>
-
-            <div className="panel-stat-grid" aria-label="Screen time metrics">
-                <article className="panel-stat">
-                    <span className="panel-stat-label">Tracked</span>
-                    <span className="panel-stat-value">{formatDuration(totalSeconds)}</span>
-                </article>
-                <article className="panel-stat">
-                    <span className="panel-stat-label">Sites</span>
-                    <span className="panel-stat-value">{sortedSites.length}</span>
-                </article>
-                <article className="panel-stat">
-                    <span className="panel-stat-label">Top Site</span>
-                    <span className="panel-stat-value">{topSite ? topSite[0] : '-'}</span>
-                </article>
-            </div>
-
-            <div className="panel-list" aria-label="Tracked sites">
-                {sortedSites.length === 0 ? (
-                    <p className="panel-empty">No tracked activity yet. Browse websites with the extension enabled.</p>
-                ) : (
-                    sortedSites.slice(0, 6).map(([domain, seconds]) => (
-                        <div key={domain} className="panel-row">
-                            <span className="panel-row-domain">{domain}</span>
-                            <span className="panel-row-time">{formatDuration(seconds)}</span>
-                        </div>
-                    ))
-                )}
             </div>
         </section>
     )
