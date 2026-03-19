@@ -337,18 +337,6 @@ export default function ScreenTimeWidget() {
                     </article>
                 </div>
 
-                <div className="panel-list" aria-label="Tracked sites">
-                    {sortedSites.length === 0 ? (
-                        <p className="panel-empty">No tracked activity yet. Browse websites with the extension enabled.</p>
-                    ) : (
-                        sortedSites.slice(0, 6).map(([domain, seconds]) => (
-                            <div key={domain} className="panel-row">
-                                <span className="panel-row-domain">{domain}</span>
-                                <span className="panel-row-time">{formatDuration(seconds)}</span>
-                            </div>
-                        ))
-                    )}
-                </div>
             </div>
         </section>
     )
