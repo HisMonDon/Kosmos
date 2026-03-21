@@ -289,8 +289,8 @@ export default function ScreenTimeWidget() {
 
     const periodCopy =
         selectedRange === 'daily'
-            ? 'Today only. Idle time is ignored so the tracker follows active browsing more closely.'
-            : 'This month so far. Idle time is ignored so totals stay more accurate.'
+            ? 'Today only. Includes all tracked browsing time.'
+            : 'This month so far. Includes all tracked browsing time.'
 
     return (
         <section className="widget-panel" aria-labelledby="screen-time-title">
@@ -332,7 +332,6 @@ export default function ScreenTimeWidget() {
                         <svg
                             className="screen-time-donut-chart"
                             viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`}
-                            aria-hidden="true"
                         >
                             <circle
                                 className="screen-time-donut-track"

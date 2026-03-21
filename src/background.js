@@ -1,11 +1,9 @@
 const DAILY_STORAGE_KEY = 'siteTimeDaily'
 const MONTHLY_STORAGE_KEY = 'siteTimeMonthly'
 const TRACKING_ALARM = 'track-site-time'
-const IDLE_DETECTION_SECONDS = 60
 
 let lastDomain = null
 let lastTs = Date.now()
-let isUserActive = true
 
 async function ensureTrackingAlarm() {
     const existingAlarm = await chrome.alarms.get(TRACKING_ALARM)
@@ -40,7 +38,6 @@ async function getCurrentActiveDomain() {
             return focusedDomain
         }
     } catch {
-        // Fall back to a broad tab query if last focused window cannot be read.
     }
 
     const tabs = await chrome.tabs.query({ active: true, windowType: 'normal' })
@@ -141,7 +138,7 @@ async function commitElapsed() {
     const startedAtMs = lastTs
     lastTs = now
 
-    if (!lastDomain || !isUserActive) {
+    if (!lastDomain) {
         return
     }
 
@@ -159,36 +156,13 @@ async function refreshActiveDomain() {
     await switchToDomain(activeDomain)
 }
 
-async function pauseTracking() {
-    await commitElapsed()
-    isUserActive = false
-    lastTs = Date.now()
-}
-
-async function resumeTracking() {
-    isUserActive = true
-    lastTs = Date.now()
-    await refreshActiveDomain()
-}
-
 chrome.runtime.onInstalled.addListener(() => {
     void ensureTrackingAlarm()
-    chrome.idle.setDetectionInterval(IDLE_DETECTION_SECONDS)
 })
 
 chrome.runtime.onStartup.addListener(async () => {
     await ensureTrackingAlarm()
-    chrome.idle.setDetectionInterval(IDLE_DETECTION_SECONDS)
-
-    const idleState = await chrome.idle.queryState(IDLE_DETECTION_SECONDS)
-    isUserActive = idleState === 'active'
-
-    if (isUserActive) {
-        await refreshActiveDomain()
-    } else {
-        lastDomain = null
-        lastTs = Date.now()
-    }
+    await refreshActiveDomain()
 })
 
 chrome.tabs.onActivated.addListener(async () => {
@@ -219,24 +193,9 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
     await commitElapsed()
 
-    if (!isUserActive) {
-        lastDomain = null
-        return
-    }
-
     const activeDomain = await getCurrentActiveDomain()
     lastDomain = activeDomain
     lastTs = Date.now()
-})
-
-chrome.idle.onStateChanged.addListener(async (newState) => {
-    if (newState === 'active') {
-        await resumeTracking()
-        return
-    }
-
-    await pauseTracking()
-    lastDomain = null
 })
 
 chrome.runtime.onSuspend.addListener(() => {
@@ -249,9 +208,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         ; (async () => {
             await commitElapsed()
 
-            if (!isUserActive) {
-                lastDomain = null
-            } else if (sender.tab?.id) {
+            if (sender.tab?.id) {
                 const tab = await chrome.tabs.get(sender.tab.id)
                 lastDomain = getDomainFromUrl(tab.url)
             } else {
