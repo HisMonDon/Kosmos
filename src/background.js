@@ -7,6 +7,13 @@ let lastDomain = null
 let lastTs = Date.now()
 let isUserActive = true
 
+async function ensureTrackingAlarm() {
+    const existingAlarm = await chrome.alarms.get(TRACKING_ALARM)
+    if (!existingAlarm) {
+        chrome.alarms.create(TRACKING_ALARM, { periodInMinutes: 1 })
+    }
+}
+
 function getDomainFromUrl(url) {
     if (!url) return null
 
@@ -22,8 +29,29 @@ function getDomainFromUrl(url) {
 }
 
 async function getCurrentActiveDomain() {
-    const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
-    return getDomainFromUrl(tabs[0]?.url)
+    try {
+        const focusedWindow = await chrome.windows.getLastFocused({
+            populate: true,
+            windowTypes: ['normal'],
+        })
+        const focusedTab = focusedWindow?.tabs?.find((tab) => tab.active)
+        const focusedDomain = getDomainFromUrl(focusedTab?.url)
+        if (focusedDomain) {
+            return focusedDomain
+        }
+    } catch {
+        // Fall back to a broad tab query if last focused window cannot be read.
+    }
+
+    const tabs = await chrome.tabs.query({ active: true, windowType: 'normal' })
+    for (const tab of tabs) {
+        const domain = getDomainFromUrl(tab.url)
+        if (domain) {
+            return domain
+        }
+    }
+
+    return null
 }
 
 function getDayKey(date) {
@@ -144,12 +172,12 @@ async function resumeTracking() {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-    chrome.alarms.create(TRACKING_ALARM, { periodInMinutes: 1 })
+    void ensureTrackingAlarm()
     chrome.idle.setDetectionInterval(IDLE_DETECTION_SECONDS)
 })
 
 chrome.runtime.onStartup.addListener(async () => {
-    chrome.alarms.create(TRACKING_ALARM, { periodInMinutes: 1 })
+    await ensureTrackingAlarm()
     chrome.idle.setDetectionInterval(IDLE_DETECTION_SECONDS)
 
     const idleState = await chrome.idle.queryState(IDLE_DETECTION_SECONDS)
@@ -242,3 +270,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 })
 
 void refreshActiveDomain()
+void ensureTrackingAlarm()
