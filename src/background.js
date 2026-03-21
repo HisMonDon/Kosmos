@@ -1,9 +1,86 @@
 const DAILY_STORAGE_KEY = 'siteTimeDaily'
 const MONTHLY_STORAGE_KEY = 'siteTimeMonthly'
 const TRACKING_ALARM = 'track-site-time'
+const BLOCKED_SITES_STORAGE_KEY = 'blockedSites'
 
 let lastDomain = null
 let lastTs = Date.now()
+
+function normalizeDomain(input) {
+    if (typeof input !== 'string') return null
+    const trimmed = input.trim().toLowerCase()
+    if (!trimmed) return null
+
+    const withScheme = /^(https?:)?\/\//.test(trimmed) ? trimmed : `https://${trimmed}`
+
+    try {
+        const parsedUrl = new URL(withScheme)
+        const hostname = parsedUrl.hostname.replace(/^www\./, '')
+        return hostname || null
+    } catch {
+        return null
+    }
+}
+
+function buildBlockRule(domain, id) {
+    return {
+        id,
+        priority: 1,
+        action: { type: 'block' },
+        condition: {
+            urlFilter: `||${domain}^`,
+            resourceTypes: ['main_frame', 'sub_frame'],
+        },
+    }
+}
+
+async function getBlockedSites() {
+    const stored = await chrome.storage.local.get(BLOCKED_SITES_STORAGE_KEY)
+    const rawSites = stored[BLOCKED_SITES_STORAGE_KEY]
+    if (!Array.isArray(rawSites)) return []
+
+    return rawSites
+        .map((site) => normalizeDomain(site))
+        .filter((site, index, list) => Boolean(site) && list.indexOf(site) === index)
+}
+
+async function syncBlockRulesFromStorage() {
+    const blockedSites = await getBlockedSites()
+    const existingRules = await chrome.declarativeNetRequest.getDynamicRules()
+    const nextRules = blockedSites.map((domain, index) => buildBlockRule(domain, index + 1))
+
+    await chrome.declarativeNetRequest.updateDynamicRules({
+        removeRuleIds: existingRules.map((rule) => rule.id),
+        addRules: nextRules,
+    })
+}
+
+async function addBlockedSite(domain) {
+    const normalizedDomain = normalizeDomain(domain)
+    if (!normalizedDomain) return { ok: false, error: 'Invalid domain' }
+
+    const blockedSites = await getBlockedSites()
+    if (!blockedSites.includes(normalizedDomain)) {
+        blockedSites.push(normalizedDomain)
+        await chrome.storage.local.set({ [BLOCKED_SITES_STORAGE_KEY]: blockedSites })
+        await syncBlockRulesFromStorage()
+    }
+
+    return { ok: true, domain: normalizedDomain }
+}
+
+async function removeBlockedSite(domain) {
+    const normalizedDomain = normalizeDomain(domain)
+    if (!normalizedDomain) return { ok: false, error: 'Invalid domain' }
+
+    const blockedSites = await getBlockedSites()
+    const nextBlockedSites = blockedSites.filter((site) => site !== normalizedDomain)
+
+    await chrome.storage.local.set({ [BLOCKED_SITES_STORAGE_KEY]: nextBlockedSites })
+    await syncBlockRulesFromStorage()
+
+    return { ok: true, domain: normalizedDomain }
+}
 
 async function ensureTrackingAlarm() {
     const existingAlarm = await chrome.alarms.get(TRACKING_ALARM)
@@ -158,11 +235,13 @@ async function refreshActiveDomain() {
 
 chrome.runtime.onInstalled.addListener(() => {
     void ensureTrackingAlarm()
+    void syncBlockRulesFromStorage()
 })
 
 chrome.runtime.onStartup.addListener(async () => {
     await ensureTrackingAlarm()
     await refreshActiveDomain()
+    await syncBlockRulesFromStorage()
 })
 
 chrome.tabs.onActivated.addListener(async () => {
@@ -203,8 +282,7 @@ chrome.runtime.onSuspend.addListener(() => {
 })
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message?.type !== 'FLUSH_SITE_TIME') return undefined
-
+    if (message?.type === 'FLUSH_SITE_TIME') {
         ; (async () => {
             await commitElapsed()
 
@@ -223,7 +301,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             sendResponse({ ok: false })
         })
 
-    return true
+        return true
+    }
+
+    if (message?.type === 'BLOCK_SITE') {
+        ; (async () => {
+            const result = await addBlockedSite(message?.domain)
+            sendResponse(result)
+        })().catch(() => {
+            sendResponse({ ok: false })
+        })
+
+        return true
+    }
+
+    if (message?.type === 'UNBLOCK_SITE') {
+        ; (async () => {
+            const result = await removeBlockedSite(message?.domain)
+            sendResponse(result)
+        })().catch(() => {
+            sendResponse({ ok: false })
+        })
+
+        return true
+    }
+
+    return undefined
 })
 
 void refreshActiveDomain()

@@ -20,7 +20,8 @@
         "storage",
         "activeTab",
         "alarms",
-        "idle"
+        "idle",
+        "declarativeNetRequest"
     ],
     "host_permissions": [
         "<all_urls>"
