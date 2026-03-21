@@ -24,6 +24,36 @@
     font-weight: 700;
 }
 
+.focus-timer {
+    width: fit-content;
+    min-width: 112px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--border));
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--bg) 82%, white);
+    display: grid;
+    gap: 2px;
+}
+
+.focus-timer.is-active {
+    background: color-mix(in srgb, var(--accent-bg) 72%, var(--bg));
+    border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
+}
+
+.focus-timer-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text);
+}
+
+.focus-timer strong {
+    color: var(--text-h);
+    font-size: 18px;
+    line-height: 1;
+}
+
 .focus-site-form {
     display: grid;
 }

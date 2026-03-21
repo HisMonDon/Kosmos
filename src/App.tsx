@@ -1,17 +1,47 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 import TodoList from './widgets/todo'
 import Sidebar, { type WidgetId } from './widgets/sidebar'
 import FocusWidget from './widgets/focus'
 import ScreenTimeWidget from './widgets/screen_time/screenTime'
 
+const FOCUS_SESSION_STORAGE_KEY = 'kosmos.focus-session-active'
+
+function loadFocusSessionFromStorage(): boolean {
+  try {
+    return window.localStorage.getItem(FOCUS_SESSION_STORAGE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
 function App() {
-  const [selectedWidget, setSelectedWidget] = useState<WidgetId>('tasks')
+  const [isFocusSessionActive, setIsFocusSessionActive] = useState(loadFocusSessionFromStorage)
+  const [selectedWidget, setSelectedWidget] = useState<WidgetId>(() => (
+    loadFocusSessionFromStorage() ? 'focus' : 'tasks'
+  ))
+
+  useEffect(() => {
+    if (isFocusSessionActive) {
+      setSelectedWidget('focus')
+    }
+  }, [isFocusSessionActive])
+
+  function handleSelectWidget(id: WidgetId) {
+    if (isFocusSessionActive) {
+      setSelectedWidget('focus')
+      return
+    }
+
+    setSelectedWidget(id)
+  }
 
   function renderWidget() {
-    switch (selectedWidget) {
+    const activeWidget = isFocusSessionActive ? 'focus' : selectedWidget
+
+    switch (activeWidget) {
       case 'focus':
-        return <FocusWidget />
+        return <FocusWidget onFocusSessionChange={setIsFocusSessionActive} />
       case 'screen_time':
         return <ScreenTimeWidget />
       case 'tasks':
@@ -31,7 +61,7 @@ function App() {
         </div>
         <div className="content-row">
           {renderWidget()}
-          <Sidebar selectedId={selectedWidget} onSelect={setSelectedWidget} />
+          <Sidebar selectedId={isFocusSessionActive ? 'focus' : selectedWidget} onSelect={handleSelectWidget} />
         </div>
       </div>
     </>

@@ -20,6 +20,7 @@ type ChromeRuntimeLike = {
 
 const BLOCKED_SITES_STORAGE_KEY = 'kosmos.blockedsites'
 const FOCUS_SESSION_STORAGE_KEY = 'kosmos.focus-session-active'
+const FOCUS_SESSION_STARTED_AT_KEY = 'kosmos.focus-session-started-at'
 
 function createId(): number {
     return Date.now() + Math.floor(Math.random() * 10000)
@@ -68,6 +69,18 @@ function loadFocusSessionFromStorage(): boolean {
     }
 }
 
+function loadFocusSessionStartedAt(): number | null {
+    try {
+        const raw = window.localStorage.getItem(FOCUS_SESSION_STARTED_AT_KEY)
+        if (!raw) return null
+
+        const parsed = Number(raw)
+        return Number.isFinite(parsed) ? parsed : null
+    } catch {
+        return null
+    }
+}
+
 function normalizeDomain(input: string): string | null {
     const trimmed = input.trim().toLowerCase()
     if (!trimmed) return null
@@ -105,10 +118,32 @@ async function syncSites(domains: string[], messageType: BlockMessageType): Prom
     return results.every(Boolean)
 }
 
-export default function FocusWidget() {
+function formatFocusDuration(durationMs: number): string {
+    const totalSeconds = Math.max(0, Math.floor(durationMs / 1000))
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
+
+    if (hours > 0) {
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+    }
+
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
+type FocusWidgetProps = {
+    onFocusSessionChange?: (isActive: boolean) => void
+}
+
+export default function FocusWidget({ onFocusSessionChange }: FocusWidgetProps) {
     const [blockedSites, setBlockedSites] = useState<FocusSite[]>(loadBlockedSitesFromStorage)
     const [siteInput, setSiteInput] = useState('')
     const [isFocusSessionActive, setIsFocusSessionActive] = useState(loadFocusSessionFromStorage)
+    const [focusSessionStartedAt, setFocusSessionStartedAt] = useState<number | null>(loadFocusSessionStartedAt)
+    const [elapsedFocusMs, setElapsedFocusMs] = useState(() => {
+        const startedAt = loadFocusSessionStartedAt()
+        return loadFocusSessionFromStorage() && startedAt !== null ? Math.max(0, Date.now() - startedAt) : 0
+    })
     const [helperMessage, setHelperMessage] = useState('Turn on Focus Mode to block distracting websites.')
     const [isSubmitting, setIsSubmitting] = useState(false)
     const hasSyncedInitialState = useRef(false)
@@ -130,6 +165,18 @@ export default function FocusWidget() {
     }, [isFocusSessionActive])
 
     useEffect(() => {
+        try {
+            if (focusSessionStartedAt === null) {
+                window.localStorage.removeItem(FOCUS_SESSION_STARTED_AT_KEY)
+            } else {
+                window.localStorage.setItem(FOCUS_SESSION_STARTED_AT_KEY, String(focusSessionStartedAt))
+            }
+        } catch {
+            //
+        }
+    }, [focusSessionStartedAt])
+
+    useEffect(() => {
         if (hasSyncedInitialState.current) return
         hasSyncedInitialState.current = true
 
@@ -138,6 +185,30 @@ export default function FocusWidget() {
             isFocusSessionActive ? 'BLOCK_SITE' : 'UNBLOCK_SITE'
         )
     }, [blockedSites, isFocusSessionActive])
+
+    useEffect(() => {
+        if (!isFocusSessionActive) {
+            setElapsedFocusMs(0)
+            return
+        }
+
+        if (focusSessionStartedAt === null) {
+            const now = Date.now()
+            setFocusSessionStartedAt(now)
+            setElapsedFocusMs(0)
+            return
+        }
+
+        setElapsedFocusMs(Math.max(0, Date.now() - focusSessionStartedAt))
+
+        const intervalId = window.setInterval(() => {
+            setElapsedFocusMs(Math.max(0, Date.now() - focusSessionStartedAt))
+        }, 1000)
+
+        return () => {
+            window.clearInterval(intervalId)
+        }
+    }, [focusSessionStartedAt, isFocusSessionActive])
 
     async function addBlockedSite(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
@@ -169,8 +240,8 @@ export default function FocusWidget() {
         setSiteInput('')
         setHelperMessage(
             isFocusSessionActive
-                ? `${domain} is blocked right now.`
-                : `${domain} will be blocked when you start focusing.`
+                ? `${domain} and its pages are blocked right now.`
+                : `${domain} and its pages will be blocked when you start focusing.`
         )
         setIsSubmitting(false)
     }
@@ -196,11 +267,6 @@ export default function FocusWidget() {
     }
 
     async function startFocusSession() {
-        if (blockedSites.length === 0) {
-            setHelperMessage('Add at least one distracting site before you start.')
-            return
-        }
-
         setIsSubmitting(true)
         const didBlockEverything = await syncSites(
             blockedSites.map((site) => site.domain),
@@ -214,7 +280,9 @@ export default function FocusWidget() {
         }
 
         setIsFocusSessionActive(true)
+        setFocusSessionStartedAt(Date.now())
         setHelperMessage(`Focus mode is on. ${blockedSites.length} site${blockedSites.length === 1 ? '' : 's'} blocked.`)
+        onFocusSessionChange?.(true)
         setIsSubmitting(false)
     }
 
@@ -232,7 +300,10 @@ export default function FocusWidget() {
         }
 
         setIsFocusSessionActive(false)
+        setFocusSessionStartedAt(null)
+        setElapsedFocusMs(0)
         setHelperMessage('Focus session ended. Your blocked sites are open again.')
+        onFocusSessionChange?.(false)
         setIsSubmitting(false)
     }
 
@@ -243,6 +314,12 @@ export default function FocusWidget() {
                 <p className="focus-description">
                     Turn on <span>Focus Mode</span> to block distracting websites and protect your momentum.
                 </p>
+                {isFocusSessionActive ? (
+                    <div className="focus-timer is-active">
+                        <span className="focus-timer-label">Time focused</span>
+                        <strong>{formatFocusDuration(elapsedFocusMs)}</strong>
+                    </div>
+                ) : null}
             </header>
 
             <form className="focus-site-form" onSubmit={addBlockedSite}>
@@ -297,7 +374,7 @@ export default function FocusWidget() {
                     type="button"
                     className={`focus-btn focus-session-button ${isFocusSessionActive ? 'is-ending' : ''}`}
                     onClick={isFocusSessionActive ? stopFocusSession : startFocusSession}
-                    disabled={isSubmitting || (!isFocusSessionActive && blockedSites.length === 0)}
+                    disabled={isSubmitting}
                 >
                     {isSubmitting ? 'Updating...' : isFocusSessionActive ? 'Stop focusing' : 'Start focusing'}
                 </button>

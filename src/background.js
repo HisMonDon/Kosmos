@@ -34,6 +34,13 @@ function buildBlockRule(domain, id) {
     }
 }
 
+function doesDomainMatchBlockedSite(domain, blockedDomain) {
+    const normalizedDomain = normalizeDomain(domain)
+    if (!normalizedDomain || !blockedDomain) return false
+
+    return normalizedDomain === blockedDomain || normalizedDomain.endsWith(`.${blockedDomain}`)
+}
+
 async function getBlockedSites() {
     const stored = await chrome.storage.local.get(BLOCKED_SITES_STORAGE_KEY)
     const rawSites = stored[BLOCKED_SITES_STORAGE_KEY]
@@ -42,6 +49,32 @@ async function getBlockedSites() {
     return rawSites
         .map((site) => normalizeDomain(site))
         .filter((site, index, list) => Boolean(site) && list.indexOf(site) === index)
+}
+
+async function refreshBlockedTabs(blockedSites) {
+    if (!Array.isArray(blockedSites) || blockedSites.length === 0) return
+
+    const tabs = await chrome.tabs.query({})
+
+    await Promise.all(
+        tabs.map(async (tab) => {
+            if (typeof tab.id !== 'number') return
+
+            const tabDomain = getDomainFromUrl(tab.url)
+            if (!tabDomain) return
+
+            const shouldReload = blockedSites.some((blockedDomain) =>
+                doesDomainMatchBlockedSite(tabDomain, blockedDomain)
+            )
+
+            if (!shouldReload) return
+
+            try {
+                await chrome.tabs.reload(tab.id)
+            } catch {
+            }
+        })
+    )
 }
 
 async function syncBlockRulesFromStorage() {
@@ -64,6 +97,7 @@ async function addBlockedSite(domain) {
         blockedSites.push(normalizedDomain)
         await chrome.storage.local.set({ [BLOCKED_SITES_STORAGE_KEY]: blockedSites })
         await syncBlockRulesFromStorage()
+        await refreshBlockedTabs([normalizedDomain])
     }
 
     return { ok: true, domain: normalizedDomain }
@@ -242,6 +276,7 @@ chrome.runtime.onStartup.addListener(async () => {
     await ensureTrackingAlarm()
     await refreshActiveDomain()
     await syncBlockRulesFromStorage()
+    await refreshBlockedTabs(await getBlockedSites())
 })
 
 chrome.tabs.onActivated.addListener(async () => {
