@@ -86,6 +86,34 @@
     font-size: 14px;
 }
 
+.focus-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.focus-header-button {
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+    border-radius: 999px;
+    padding: 8px 14px;
+    background: color-mix(in srgb, var(--accent-bg) 52%, var(--bg));
+    color: var(--text-h);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition:
+        background-color 160ms ease,
+        transform 160ms ease;
+}
+
+.focus-header-button:hover,
+.focus-header-button:focus-visible {
+    outline: none;
+    background: color-mix(in srgb, var(--accent-bg) 75%, var(--bg));
+    transform: translateY(-1px);
+}
+
 .screen-time-header {
     display: flex;
     align-items: flex-start;

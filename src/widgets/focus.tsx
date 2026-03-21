@@ -3,7 +3,10 @@ import './widgetPanel.css'
 export default function FocusWidget() {
     return (
         <section className="widget-panel" aria-labelledby="focus-title">
-            <h1 id="focus-title">Focus</h1>
+            <div className="focus-header-row">
+                <h1 id="focus-title">Focus</h1>
+                <button className="focus-header-button" type="button">button</button>
+            </div>
             <p>Track your deep-work rhythm and maintain distraction-free blocks.</p>
             <div className="panel-stat-grid" aria-label="Focus metrics">
                 <article className="panel-stat">
