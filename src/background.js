@@ -6,6 +6,30 @@ const BLOCKED_SITES_STORAGE_KEY = 'blockedSites'
 let lastDomain = null
 let lastTs = Date.now()
 
+function getDeclarativeNetRequestApi() {
+    const api = chrome.declarativeNetRequest
+
+    if (
+        !api ||
+        typeof api.getDynamicRules !== 'function' ||
+        typeof api.updateDynamicRules !== 'function'
+    ) {
+        return null
+    }
+
+    return api
+}
+
+function logBackgroundWarning(context, error) {
+    console.warn(`[Kosmos] ${context}`, error)
+}
+
+function runAsyncTask(task, context) {
+    void task().catch((error) => {
+        logBackgroundWarning(context, error)
+    })
+}
+
 function normalizeDomain(input) {
     if (typeof input !== 'string') return null
     const trimmed = input.trim().toLowerCase()
@@ -78,14 +102,21 @@ async function refreshBlockedTabs(blockedSites) {
 }
 
 async function syncBlockRulesFromStorage() {
+    const declarativeNetRequestApi = getDeclarativeNetRequestApi()
+    if (!declarativeNetRequestApi) {
+        return false
+    }
+
     const blockedSites = await getBlockedSites()
-    const existingRules = await chrome.declarativeNetRequest.getDynamicRules()
+    const existingRules = await declarativeNetRequestApi.getDynamicRules()
     const nextRules = blockedSites.map((domain, index) => buildBlockRule(domain, index + 1))
 
-    await chrome.declarativeNetRequest.updateDynamicRules({
+    await declarativeNetRequestApi.updateDynamicRules({
         removeRuleIds: existingRules.map((rule) => rule.id),
         addRules: nextRules,
     })
+
+    return true
 }
 
 async function addBlockedSite(domain) {
@@ -96,7 +127,11 @@ async function addBlockedSite(domain) {
     if (!blockedSites.includes(normalizedDomain)) {
         blockedSites.push(normalizedDomain)
         await chrome.storage.local.set({ [BLOCKED_SITES_STORAGE_KEY]: blockedSites })
-        await syncBlockRulesFromStorage()
+        const didSyncRules = await syncBlockRulesFromStorage()
+        if (!didSyncRules) {
+            return { ok: false, error: 'Site blocking is unavailable in this browser.' }
+        }
+
         await refreshBlockedTabs([normalizedDomain])
     }
 
@@ -111,7 +146,10 @@ async function removeBlockedSite(domain) {
     const nextBlockedSites = blockedSites.filter((site) => site !== normalizedDomain)
 
     await chrome.storage.local.set({ [BLOCKED_SITES_STORAGE_KEY]: nextBlockedSites })
-    await syncBlockRulesFromStorage()
+    const didSyncRules = await syncBlockRulesFromStorage()
+    if (!didSyncRules) {
+        return { ok: false, error: 'Site blocking is unavailable in this browser.' }
+    }
 
     return { ok: true, domain: normalizedDomain }
 }
@@ -268,48 +306,56 @@ async function refreshActiveDomain() {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-    void ensureTrackingAlarm()
-    void syncBlockRulesFromStorage()
+    runAsyncTask(ensureTrackingAlarm, 'Unable to create tracking alarm during install.')
+    runAsyncTask(syncBlockRulesFromStorage, 'Unable to sync block rules during install.')
 })
 
-chrome.runtime.onStartup.addListener(async () => {
-    await ensureTrackingAlarm()
-    await refreshActiveDomain()
-    await syncBlockRulesFromStorage()
-    await refreshBlockedTabs(await getBlockedSites())
+chrome.runtime.onStartup.addListener(() => {
+    runAsyncTask(async () => {
+        await ensureTrackingAlarm()
+        await refreshActiveDomain()
+        await syncBlockRulesFromStorage()
+        await refreshBlockedTabs(await getBlockedSites())
+    }, 'Unable to restore background state on startup.')
 })
 
-chrome.tabs.onActivated.addListener(async () => {
-    await refreshActiveDomain()
+chrome.tabs.onActivated.addListener(() => {
+    runAsyncTask(refreshActiveDomain, 'Unable to refresh the active domain after tab activation.')
 })
 
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-    if (!tab.active) return
-    if (!('url' in changeInfo) && changeInfo.status !== 'complete') return
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    runAsyncTask(async () => {
+        if (!tab.active) return
+        if (!('url' in changeInfo) && changeInfo.status !== 'complete') return
 
-    const nextDomain = getDomainFromUrl(tab.url)
-    if (nextDomain !== lastDomain) {
-        await switchToDomain(nextDomain)
-    }
+        const nextDomain = getDomainFromUrl(tab.url)
+        if (nextDomain !== lastDomain) {
+            await switchToDomain(nextDomain)
+        }
+    }, `Unable to update the tracked domain for tab ${tabId}.`)
 })
 
-chrome.windows.onFocusChanged.addListener(async (windowId) => {
-    if (windowId === chrome.windows.WINDOW_ID_NONE) {
-        await switchToDomain(null)
-        return
-    }
+chrome.windows.onFocusChanged.addListener((windowId) => {
+    runAsyncTask(async () => {
+        if (windowId === chrome.windows.WINDOW_ID_NONE) {
+            await switchToDomain(null)
+            return
+        }
 
-    await refreshActiveDomain()
+        await refreshActiveDomain()
+    }, `Unable to refresh the active domain after window focus changed to ${windowId}.`)
 })
 
-chrome.alarms.onAlarm.addListener(async (alarm) => {
-    if (alarm.name !== TRACKING_ALARM) return
+chrome.alarms.onAlarm.addListener((alarm) => {
+    runAsyncTask(async () => {
+        if (alarm.name !== TRACKING_ALARM) return
 
-    await commitElapsed()
+        await commitElapsed()
 
-    const activeDomain = await getCurrentActiveDomain()
-    lastDomain = activeDomain
-    lastTs = Date.now()
+        const activeDomain = await getCurrentActiveDomain()
+        lastDomain = activeDomain
+        lastTs = Date.now()
+    }, `Unable to process alarm ${alarm.name}.`)
 })
 
 chrome.runtime.onSuspend.addListener(() => {
@@ -364,5 +410,5 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return undefined
 })
 
-void refreshActiveDomain()
-void ensureTrackingAlarm()
+runAsyncTask(refreshActiveDomain, 'Unable to refresh the initial active domain.')
+runAsyncTask(ensureTrackingAlarm, 'Unable to create the initial tracking alarm.')

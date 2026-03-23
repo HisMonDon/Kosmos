@@ -295,7 +295,7 @@ export default function TodoList() {
 
     return (
         <div className="todo-container">
-            <header className="todo-header" style={{ paddingTop: '10px' }}>
+            <header className="todo-header" style={{ paddingTop: '16px' }}>
                 <h1>Tasks</h1>
                 <div className="todo-stats">
                     <div className="stat-item">
