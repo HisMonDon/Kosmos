@@ -32,6 +32,13 @@ function getTodayKey(): string {
     return `${year}-${month}-${day}`
 }
 
+function getMillisecondsUntilNextDay(): number {
+    const now = new Date()
+    const nextMidnight = new Date(now)
+    nextMidnight.setHours(24, 0, 0, 0)
+    return Math.max(nextMidnight.getTime() - now.getTime(), 0)
+}
+
 function getWeekdayLabel(weekday: number): string {
     return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][weekday] ?? 'Unknown day'
 }
@@ -149,6 +156,7 @@ function loadRecurringTasksFromStorage(): RecurringTask[] {
 
 export default function TodoList() {
     const [input, setInput] = useState('')
+    const [todayKey, setTodayKey] = useState(getTodayKey)
     const [todos, setTodos] = useState<Todo[]>(loadTodosFromStorage)
     const [recurringTasks, setRecurringTasks] = useState<RecurringTask[]>(loadRecurringTasksFromStorage)
     const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false)
@@ -175,12 +183,23 @@ export default function TodoList() {
     }, [recurringTasks])
 
     useEffect(() => {
-        const today = getTodayKey()
+        const timeoutId = window.setTimeout(() => {
+            setTodayKey(getTodayKey())
+        }, getMillisecondsUntilNextDay() + 1000)
+
+        return () => window.clearTimeout(timeoutId)
+    }, [todayKey])
+
+    useEffect(() => {
         const todayWeekday = new Date().getDay()
 
         setTodos((previousTodos) => {
-            let didAdd = false
-            let nextTodos = previousTodos
+            const nextTodos = previousTodos.filter((todo) => {
+                if (!todo.recurringOrigin || todo.done) return true
+                return todo.recurringOrigin.occurrenceDate >= todayKey
+            })
+
+            let didChange = nextTodos.length !== previousTodos.length
 
             recurringTasks.forEach((task) => {
                 const isDueToday =
@@ -192,14 +211,10 @@ export default function TodoList() {
                 const alreadyExists = nextTodos.some(
                     (todo) =>
                         todo.recurringOrigin?.recurringId === task.id &&
-                        todo.recurringOrigin.occurrenceDate === today
+                        todo.recurringOrigin.occurrenceDate === todayKey
                 )
 
                 if (alreadyExists) return
-
-                if (nextTodos === previousTodos) {
-                    nextTodos = [...previousTodos]
-                }
 
                 nextTodos.push({
                     id: createId(),
@@ -207,15 +222,15 @@ export default function TodoList() {
                     done: false,
                     recurringOrigin: {
                         recurringId: task.id,
-                        occurrenceDate: today,
+                        occurrenceDate: todayKey,
                     },
                 })
-                didAdd = true
+                didChange = true
             })
 
-            return didAdd ? nextTodos : previousTodos
+            return didChange ? nextTodos : previousTodos
         })
-    }, [recurringTasks])
+    }, [recurringTasks, todayKey])
 
     function addTodo() {
         const text = input.trim()
