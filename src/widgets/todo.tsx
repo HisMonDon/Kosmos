@@ -39,6 +39,11 @@ function getMillisecondsUntilNextDay(): number {
     return Math.max(nextMidnight.getTime() - now.getTime(), 0)
 }
 
+function getWeekdayFromDateKey(dateKey: string): number {
+    const [year, month, day] = dateKey.split('-').map(Number)
+    return new Date(year, month - 1, day).getDay()
+}
+
 function getWeekdayLabel(weekday: number): string {
     return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][weekday] ?? 'Unknown day'
 }
@@ -154,11 +159,61 @@ function loadRecurringTasksFromStorage(): RecurringTask[] {
     }
 }
 
+function syncRecurringTodos(previousTodos: Todo[], recurringTasks: RecurringTask[], todayKey: string): Todo[] {
+    const nextTodos = previousTodos.filter((todo) => {
+        if (!todo.recurringOrigin || todo.done) return true
+        return todo.recurringOrigin.occurrenceDate >= todayKey
+    })
+
+    let didChange = nextTodos.length !== previousTodos.length
+    const todayWeekday = getWeekdayFromDateKey(todayKey)
+
+    recurringTasks.forEach((task) => {
+        const isDueToday =
+            task.mode === 'daily' ||
+            (task.mode === 'weekly' && task.weekday === todayWeekday)
+
+        if (!isDueToday) return
+
+        const alreadyExists = nextTodos.some(
+            (todo) =>
+                todo.recurringOrigin?.recurringId === task.id &&
+                todo.recurringOrigin.occurrenceDate === todayKey
+        )
+
+        if (alreadyExists) return
+
+        nextTodos.push({
+            id: createId(),
+            text: task.text,
+            done: false,
+            recurringOrigin: {
+                recurringId: task.id,
+                occurrenceDate: todayKey,
+            },
+        })
+        didChange = true
+    })
+
+    return didChange ? nextTodos : previousTodos
+}
+
 export default function TodoList() {
+    const [initialState] = useState(() => {
+        const initialTodayKey = getTodayKey()
+        const initialRecurringTasks = loadRecurringTasksFromStorage()
+
+        return {
+            todayKey: initialTodayKey,
+            recurringTasks: initialRecurringTasks,
+            todos: syncRecurringTodos(loadTodosFromStorage(), initialRecurringTasks, initialTodayKey),
+        }
+    })
+
     const [input, setInput] = useState('')
-    const [todayKey, setTodayKey] = useState(getTodayKey)
-    const [todos, setTodos] = useState<Todo[]>(loadTodosFromStorage)
-    const [recurringTasks, setRecurringTasks] = useState<RecurringTask[]>(loadRecurringTasksFromStorage)
+    const [todayKey, setTodayKey] = useState(initialState.todayKey)
+    const [todos, setTodos] = useState<Todo[]>(initialState.todos)
+    const [recurringTasks, setRecurringTasks] = useState<RecurringTask[]>(initialState.recurringTasks)
     const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false)
     const [editingRecurringId, setEditingRecurringId] = useState<number | null>(null)
     const [recurringText, setRecurringText] = useState('')
@@ -184,52 +239,12 @@ export default function TodoList() {
 
     useEffect(() => {
         const timeoutId = window.setTimeout(() => {
-            setTodayKey(getTodayKey())
+            const nextTodayKey = getTodayKey()
+            setTodayKey(nextTodayKey)
+            setTodos((previousTodos) => syncRecurringTodos(previousTodos, recurringTasks, nextTodayKey))
         }, getMillisecondsUntilNextDay() + 1000)
 
         return () => window.clearTimeout(timeoutId)
-    }, [todayKey])
-
-    useEffect(() => {
-        const todayWeekday = new Date().getDay()
-
-        setTodos((previousTodos) => {
-            const nextTodos = previousTodos.filter((todo) => {
-                if (!todo.recurringOrigin || todo.done) return true
-                return todo.recurringOrigin.occurrenceDate >= todayKey
-            })
-
-            let didChange = nextTodos.length !== previousTodos.length
-
-            recurringTasks.forEach((task) => {
-                const isDueToday =
-                    task.mode === 'daily' ||
-                    (task.mode === 'weekly' && task.weekday === todayWeekday)
-
-                if (!isDueToday) return
-
-                const alreadyExists = nextTodos.some(
-                    (todo) =>
-                        todo.recurringOrigin?.recurringId === task.id &&
-                        todo.recurringOrigin.occurrenceDate === todayKey
-                )
-
-                if (alreadyExists) return
-
-                nextTodos.push({
-                    id: createId(),
-                    text: task.text,
-                    done: false,
-                    recurringOrigin: {
-                        recurringId: task.id,
-                        occurrenceDate: todayKey,
-                    },
-                })
-                didChange = true
-            })
-
-            return didChange ? nextTodos : previousTodos
-        })
     }, [recurringTasks, todayKey])
 
     function addTodo() {
@@ -279,7 +294,9 @@ export default function TodoList() {
     }
 
     function removeRecurringTask(id: number) {
-        setRecurringTasks((prev) => prev.filter((task) => task.id !== id))
+        const nextRecurringTasks = recurringTasks.filter((task) => task.id !== id)
+        setRecurringTasks(nextRecurringTasks)
+        setTodos((prev) => syncRecurringTodos(prev, nextRecurringTasks, todayKey))
         if (editingRecurringId === id) {
             closeRecurringModal()
         }
@@ -297,13 +314,12 @@ export default function TodoList() {
             ...(recurringMode === 'weekly' ? { weekday: recurringWeekday } : {}),
         }
 
-        setRecurringTasks((prev) => {
-            if (editingRecurringId === null) {
-                return [...prev, nextTask]
-            }
+        const nextRecurringTasks = editingRecurringId === null
+            ? [...recurringTasks, nextTask]
+            : recurringTasks.map((task) => (task.id === editingRecurringId ? nextTask : task))
 
-            return prev.map((task) => (task.id === editingRecurringId ? nextTask : task))
-        })
+        setRecurringTasks(nextRecurringTasks)
+        setTodos((prev) => syncRecurringTodos(prev, nextRecurringTasks, todayKey))
 
         closeRecurringModal()
     }
