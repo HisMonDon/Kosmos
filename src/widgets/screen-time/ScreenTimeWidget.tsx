@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import '../widgetPanel.css'
+import '../shared/widgetPanel.css'
 
 const DAILY_STORAGE_KEY = 'siteTimeDaily'
 const MONTHLY_STORAGE_KEY = 'siteTimeMonthly'

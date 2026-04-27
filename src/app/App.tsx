@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import './App.css'
-import TodoList from './widgets/todo'
-import Sidebar, { type WidgetId } from './widgets/sidebar'
-import FocusWidget from './widgets/focus'
-import ScreenTimeWidget from './widgets/screen_time/screenTime'
+import TodoList from '../widgets/tasks/TodoList'
+import Sidebar, { type WidgetId } from '../widgets/sidebar/Sidebar'
+import FocusWidget from '../widgets/focus/FocusWidget'
+import ScreenTimeWidget from '../widgets/screen-time/ScreenTimeWidget'
 
 const FOCUS_SESSION_STORAGE_KEY = 'kosmos.focus-session-active'
 
@@ -55,7 +55,7 @@ function App() {
       <div className="columncenter app-shell">
         <div className="app-header rowstart">
           <span className="brand-title">Kosmos</span>
-          <span className="brand-studio">Chenyu Lu Studios</span>
+          <span className="brand-studio">Chenyu Lu IB EE</span>
           <div className="ticks"></div>
         </div>
         <div className="content-row">

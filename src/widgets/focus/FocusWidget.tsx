@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import './widgetPanel.css'
+import '../shared/widgetPanel.css'
 import './focus.css'
 
 type FocusSite = {
