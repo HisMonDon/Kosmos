@@ -53,10 +53,9 @@ function App() {
   return (
     <>
       <div className="columncenter app-shell">
-        <div className="rowstart app-header">
-          <span className="brand-title">
-            Kosmos
-          </span>
+        <div className="app-header rowstart">
+          <span className="brand-title">Kosmos</span>
+          <span className="brand-studio">Chenyu Lu Studios</span>
           <div className="ticks"></div>
         </div>
         <div className="content-row">
