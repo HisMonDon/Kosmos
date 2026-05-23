@@ -70,7 +70,13 @@ async function getBlockedSites() {
     const rawSites = stored[BLOCKED_SITES_STORAGE_KEY]
     if (!Array.isArray(rawSites)) return []
 
-    return rawSites
+    return normalizeDomainList(rawSites)
+}
+
+function normalizeDomainList(sites) {
+    if (!Array.isArray(sites)) return []
+
+    return sites
         .map((site) => normalizeDomain(site))
         .filter((site, index, list) => Boolean(site) && list.indexOf(site) === index)
 }
@@ -136,6 +142,29 @@ async function addBlockedSite(domain) {
     }
 
     return { ok: true, domain: normalizedDomain }
+}
+
+async function replaceBlockedSites(domains) {
+    const nextBlockedSites = normalizeDomainList(domains)
+
+    await chrome.storage.local.set({ [BLOCKED_SITES_STORAGE_KEY]: nextBlockedSites })
+    const didSyncRules = await syncBlockRulesFromStorage()
+    if (!didSyncRules) {
+        return { ok: false, error: 'Site blocking is unavailable in this browser.' }
+    }
+
+    await refreshBlockedTabs(nextBlockedSites)
+    return { ok: true, domains: nextBlockedSites }
+}
+
+async function clearBlockedSites() {
+    await chrome.storage.local.set({ [BLOCKED_SITES_STORAGE_KEY]: [] })
+    const didSyncRules = await syncBlockRulesFromStorage()
+    if (!didSyncRules) {
+        return { ok: false, error: 'Site blocking is unavailable in this browser.' }
+    }
+
+    return { ok: true }
 }
 
 async function removeBlockedSite(domain) {
@@ -399,6 +428,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message?.type === 'UNBLOCK_SITE') {
         ; (async () => {
             const result = await removeBlockedSite(message?.domain)
+            sendResponse(result)
+        })().catch(() => {
+            sendResponse({ ok: false })
+        })
+
+        return true
+    }
+
+    if (message?.type === 'START_FOCUS_SESSION') {
+        ; (async () => {
+            const result = await replaceBlockedSites(message?.domains)
+            sendResponse(result)
+        })().catch(() => {
+            sendResponse({ ok: false })
+        })
+
+        return true
+    }
+
+    if (message?.type === 'STOP_FOCUS_SESSION') {
+        ; (async () => {
+            const result = await clearBlockedSites()
             sendResponse(result)
         })().catch(() => {
             sendResponse({ ok: false })

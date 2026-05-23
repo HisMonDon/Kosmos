@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import './App.css'
 import TodoList from '../widgets/tasks/TodoList'
 import Sidebar, { type WidgetId } from '../widgets/sidebar/Sidebar'
@@ -16,32 +16,18 @@ function loadFocusSessionFromStorage(): boolean {
 }
 
 function App() {
-  const [isFocusSessionActive, setIsFocusSessionActive] = useState(loadFocusSessionFromStorage)
   const [selectedWidget, setSelectedWidget] = useState<WidgetId>(() => (
     loadFocusSessionFromStorage() ? 'focus' : 'tasks'
   ))
 
-  useEffect(() => {
-    if (isFocusSessionActive) {
-      setSelectedWidget('focus')
-    }
-  }, [isFocusSessionActive])
-
   function handleSelectWidget(id: WidgetId) {
-    if (isFocusSessionActive) {
-      setSelectedWidget('focus')
-      return
-    }
-
     setSelectedWidget(id)
   }
 
   function renderWidget() {
-    const activeWidget = isFocusSessionActive ? 'focus' : selectedWidget
-
-    switch (activeWidget) {
+    switch (selectedWidget) {
       case 'focus':
-        return <FocusWidget onFocusSessionChange={setIsFocusSessionActive} />
+        return <FocusWidget />
       case 'screen_time':
         return <ScreenTimeWidget />
       case 'tasks':
@@ -60,7 +46,7 @@ function App() {
         </div>
         <div className="content-row">
           {renderWidget()}
-          <Sidebar selectedId={isFocusSessionActive ? 'focus' : selectedWidget} onSelect={handleSelectWidget} />
+          <Sidebar selectedId={selectedWidget} onSelect={handleSelectWidget} />
         </div>
       </div>
     </>

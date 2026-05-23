@@ -7,7 +7,10 @@ type FocusSite = {
     domain: string
 }
 
-type BlockMessageType = 'BLOCK_SITE' | 'UNBLOCK_SITE'
+type BlockMessage =
+    | { type: 'BLOCK_SITE' | 'UNBLOCK_SITE'; domain: string }
+    | { type: 'START_FOCUS_SESSION'; domains: string[] }
+    | { type: 'STOP_FOCUS_SESSION' }
 
 type RuntimeResponse = {
     ok?: boolean
@@ -15,7 +18,7 @@ type RuntimeResponse = {
 
 type ChromeRuntimeLike = {
     lastError?: { message?: string }
-    sendMessage?: (message: { type: BlockMessageType; domain: string }, callback: (response?: RuntimeResponse) => void) => void
+    sendMessage?: (message: BlockMessage, callback: (response?: RuntimeResponse) => void) => void
 }
 
 const BLOCKED_SITES_STORAGE_KEY = 'kosmos.blockedsites'
@@ -96,12 +99,12 @@ function normalizeDomain(input: string): string | null {
     }
 }
 
-async function sendBlockMessage(type: BlockMessageType, domain: string): Promise<boolean> {
+async function sendFocusMessage(message: BlockMessage): Promise<boolean> {
     const runtime = (globalThis as { chrome?: { runtime?: ChromeRuntimeLike } }).chrome?.runtime
     if (!runtime?.sendMessage) return false
 
     return new Promise((resolve) => {
-        runtime.sendMessage?.({ type, domain }, (response) => {
+        runtime.sendMessage?.(message, (response) => {
             if (runtime.lastError) {
                 resolve(false)
                 return
@@ -112,10 +115,8 @@ async function sendBlockMessage(type: BlockMessageType, domain: string): Promise
     })
 }
 
-async function syncSites(domains: string[], messageType: BlockMessageType): Promise<boolean> {
-    if (domains.length === 0) return true
-    const results = await Promise.all(domains.map((domain) => sendBlockMessage(messageType, domain)))
-    return results.every(Boolean)
+function getBlockedDomains(blockedSites: FocusSite[]): string[] {
+    return blockedSites.map((site) => site.domain)
 }
 
 function formatFocusDuration(durationMs: number): string {
@@ -139,7 +140,10 @@ export default function FocusWidget({ onFocusSessionChange }: FocusWidgetProps) 
     const [blockedSites, setBlockedSites] = useState<FocusSite[]>(loadBlockedSitesFromStorage)
     const [siteInput, setSiteInput] = useState('')
     const [isFocusSessionActive, setIsFocusSessionActive] = useState(loadFocusSessionFromStorage)
-    const [focusSessionStartedAt, setFocusSessionStartedAt] = useState<number | null>(loadFocusSessionStartedAt)
+    const [focusSessionStartedAt, setFocusSessionStartedAt] = useState<number | null>(() => {
+        if (!loadFocusSessionFromStorage()) return null
+        return loadFocusSessionStartedAt() ?? Date.now()
+    })
     const [elapsedFocusMs, setElapsedFocusMs] = useState(() => {
         const startedAt = loadFocusSessionStartedAt()
         return loadFocusSessionFromStorage() && startedAt !== null ? Math.max(0, Date.now() - startedAt) : 0
@@ -180,26 +184,19 @@ export default function FocusWidget({ onFocusSessionChange }: FocusWidgetProps) 
         if (hasSyncedInitialState.current) return
         hasSyncedInitialState.current = true
 
-        void syncSites(
-            blockedSites.map((site) => site.domain),
-            isFocusSessionActive ? 'BLOCK_SITE' : 'UNBLOCK_SITE'
+        void sendFocusMessage(
+            isFocusSessionActive
+                ? { type: 'START_FOCUS_SESSION', domains: getBlockedDomains(blockedSites) }
+                : { type: 'STOP_FOCUS_SESSION' }
         )
     }, [blockedSites, isFocusSessionActive])
 
     useEffect(() => {
         if (!isFocusSessionActive) {
-            setElapsedFocusMs(0)
             return
         }
 
-        if (focusSessionStartedAt === null) {
-            const now = Date.now()
-            setFocusSessionStartedAt(now)
-            setElapsedFocusMs(0)
-            return
-        }
-
-        setElapsedFocusMs(Math.max(0, Date.now() - focusSessionStartedAt))
+        if (focusSessionStartedAt === null) return
 
         const intervalId = window.setInterval(() => {
             setElapsedFocusMs(Math.max(0, Date.now() - focusSessionStartedAt))
@@ -228,7 +225,7 @@ export default function FocusWidget({ onFocusSessionChange }: FocusWidgetProps) 
         setIsSubmitting(true)
 
         if (isFocusSessionActive) {
-            const blocked = await sendBlockMessage('BLOCK_SITE', domain)
+            const blocked = await sendFocusMessage({ type: 'BLOCK_SITE', domain })
             if (!blocked) {
                 setIsSubmitting(false)
                 setHelperMessage('I could not update the blocker just now.')
@@ -253,7 +250,7 @@ export default function FocusWidget({ onFocusSessionChange }: FocusWidgetProps) 
         setIsSubmitting(true)
 
         if (isFocusSessionActive) {
-            const unblocked = await sendBlockMessage('UNBLOCK_SITE', target.domain)
+            const unblocked = await sendFocusMessage({ type: 'UNBLOCK_SITE', domain: target.domain })
             if (!unblocked) {
                 setIsSubmitting(false)
                 setHelperMessage(`I could not unblock ${target.domain} right now.`)
@@ -268,10 +265,10 @@ export default function FocusWidget({ onFocusSessionChange }: FocusWidgetProps) 
 
     async function startFocusSession() {
         setIsSubmitting(true)
-        const didBlockEverything = await syncSites(
-            blockedSites.map((site) => site.domain),
-            'BLOCK_SITE'
-        )
+        const didBlockEverything = await sendFocusMessage({
+            type: 'START_FOCUS_SESSION',
+            domains: getBlockedDomains(blockedSites),
+        })
 
         if (!didBlockEverything) {
             setHelperMessage('Some sites did not block correctly. Try again.')
@@ -288,10 +285,7 @@ export default function FocusWidget({ onFocusSessionChange }: FocusWidgetProps) 
 
     async function stopFocusSession() {
         setIsSubmitting(true)
-        const didUnblockEverything = await syncSites(
-            blockedSites.map((site) => site.domain),
-            'UNBLOCK_SITE'
-        )
+        const didUnblockEverything = await sendFocusMessage({ type: 'STOP_FOCUS_SESSION' })
 
         if (!didUnblockEverything) {
             setHelperMessage('I could not fully end the session. Try once more.')
