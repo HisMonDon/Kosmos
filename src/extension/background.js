@@ -396,7 +396,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         ; (async () => {
             await commitElapsed()
 
-            if (sender.tab?.id) {
+            if (typeof sender.tab?.id === 'number') {
                 const tab = await chrome.tabs.get(sender.tab.id)
                 lastDomain = getDomainFromUrl(tab.url)
             } else {
