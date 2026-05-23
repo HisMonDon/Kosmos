@@ -18,9 +18,7 @@
     "permissions": [
         "tabs",
         "storage",
-        "activeTab",
         "alarms",
-        "idle",
         "declarativeNetRequest"
     ],
     "host_permissions": [
